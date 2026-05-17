@@ -75,7 +75,7 @@ async function parseNavigation(baseUrl) {
                 currentSessionEvents = [];
             }
             const text = $(el).text().replace(/\s+/g, ' ').trim();
-            const m = text.match(/Session\s+(\d+)\s+(\d+\/\d+\/\d+)\s+at\s+(\d+:\d+)\s*(am|pm)?/i);
+            const m = text.match(/Session\s+(\d+?)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\s+at\s+(\d+:\d+)\s*(am|pm)?/i);
             if (m) {
                 let timeStr = m[3];
                 if ((m[4] || '').toLowerCase() === 'pm' && !timeStr.startsWith('12')) {

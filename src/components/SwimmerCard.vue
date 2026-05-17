@@ -61,8 +61,20 @@
         </div>
       </div>
 
-      <div v-if="data.results.length" class="race-panel">
+      <div v-if="data.results.length || pendingRaces.length" class="race-panel">
         <div class="section-title">Race Results</div>
+        <div v-for="r in pendingRaces" :key="'pending-' + r.event_id + r.heat" class="result-card result-card--pending">
+          <div class="result-card-header">
+            <div class="result-left">
+              <div class="result-place-col"><span class="place place-other">?</span></div>
+              <div class="result-info">
+                <div class="result-event-name">{{ r.event_name.replace(/^\d+\s*/, '') }}</div>
+                <div class="result-meta"><span class="result-points">Heat {{ r.heat }} · Lane {{ r.lane }}</span></div>
+              </div>
+            </div>
+            <div class="result-right"><div class="result-time pending-label">Pending</div></div>
+          </div>
+        </div>
         <div v-for="r in sortedResults" :key="r.event_id + r.age_group" class="result-card">
           <div class="result-card-header">
             <div class="result-left">
@@ -111,7 +123,7 @@ const silverCount = computed(() => props.data.results.filter(r => r.place === '2
 const bronzeCount = computed(() => props.data.results.filter(r => r.place === '3').length)
 const sortedResults = computed(() => [...props.data.results].sort((a, b) => (parseInt(a.event_id) || 999) - (parseInt(b.event_id) || 999)))
 const completedEventIds = computed(() => new Set(props.data.results.map(r => r.event_id)))
-const upcomingRaces = computed(() =>
+const unresultedStartLists = computed(() =>
   props.data.startLists
     .filter(s => !completedEventIds.value.has(s.event_id))
     .sort((a, b) => {
@@ -119,6 +131,18 @@ const upcomingRaces = computed(() =>
       const bi = props.heatSchedule.findIndex(h => h.eventId === b.event_id && h.heat === b.heat)
       return ai - bi
     })
+)
+const upcomingRaces = computed(() =>
+  unresultedStartLists.value.filter(s => {
+    const h = props.heatSchedule.find(h => h.eventId === s.event_id && h.heat === s.heat)
+    return !h?.isComplete
+  })
+)
+const pendingRaces = computed(() =>
+  unresultedStartLists.value.filter(s => {
+    const h = props.heatSchedule.find(h => h.eventId === s.event_id && h.heat === s.heat)
+    return h?.isComplete
+  })
 )
 const currentHeatIndex = computed(() => {
   const i = props.heatSchedule.findIndex(h => !h.isComplete)
@@ -191,6 +215,9 @@ function placeClass(place: string) {
 .section-title { font-size: 1.2rem; color: #fff; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
 .section-title::before { content: ''; width: 4px; height: 20px; background: #00d9ff; border-radius: 2px; }
 .result-card { background: rgba(0,217,255,0.05); border: 1px solid rgba(0,217,255,0.15); border-radius: 8px; padding: 12px 15px; margin-bottom: 8px; }
+.result-card--pending { background: rgba(255,193,7,0.05); border-color: rgba(255,193,7,0.2); }
+.result-card--pending .result-event-name { color: #ffc107; }
+.pending-label { font-size: 0.8rem; color: #ffc107; font-family: inherit; letter-spacing: 0.05em; }
 .result-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .result-event-name { color: #00d9ff; font-weight: 600; margin-bottom: 4px; font-size: 0.95rem; }
 .result-meta { display: flex; align-items: center; gap: 8px; }

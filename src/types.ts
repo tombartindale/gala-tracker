@@ -19,4 +19,5 @@ export interface HeatScheduleItem {
   eventId: string; heat: string; eventName: string
   isComplete: boolean; estimatedTime: number; heatDuration: number
   estimatedStart: Date | null
+  sessionStart: Date | null
 }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="110" fill="#1a1a2e"/>
+
+  <!-- Head -->
+  <circle cx="355" cy="195" r="42" fill="#00d9ff"/>
+
+  <!-- Body -->
+  <line x1="318" y1="212" x2="118" y2="255" stroke="#00d9ff" stroke-width="34" stroke-linecap="round"/>
+
+  <!-- Front arm (reaching) -->
+  <line x1="132" y1="250" x2="62" y2="203" stroke="#00d9ff" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Recovery arm (above water) -->
+  <line x1="312" y1="218" x2="395" y2="148" stroke="#00d9ff" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Flutter kick -->
+  <line x1="125" y1="258" x2="68" y2="308" stroke="#00d9ff" stroke-width="26" stroke-linecap="round"/>
+  <line x1="140" y1="263" x2="92" y2="318" stroke="#00d9ff" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Wave lines -->
+  <path d="M48 328 Q148 292 256 328 Q364 364 462 328"
+        fill="none" stroke="#00d9ff" stroke-width="18" stroke-linecap="round" opacity="0.65"/>
+  <path d="M48 374 Q148 338 256 374 Q364 410 462 374"
+        fill="none" stroke="#00d9ff" stroke-width="13" stroke-linecap="round" opacity="0.35"/>
+</svg>

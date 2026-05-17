@@ -4,12 +4,10 @@
       <p class="app-label">Swim Results Tracker</p>
       <h1>{{ gala?.title || 'Loading...' }}</h1>
       <nav v-if="allGalas.length > 1" class="gala-nav">
-        <router-link
-          v-for="g in allGalas"
-          :key="g.gala_id"
+        <router-link v-for="g in allGalas" :key="g.gala_id"
           :to="g.isToday ? '/' : { name: 'gala', params: { galaId: g.gala_id } }"
-          :class="['gala-nav-item', { active: galaId === g.gala_id }]"
-        >{{ g.label }}</router-link>
+          :class="['gala-nav-item', { active: galaId === g.gala_id }]"><span class="gala-nav-name">{{ g.name
+          }}</span><span class="gala-nav-dates">{{ g.dates }}</span></router-link>
       </nav>
     </header>
 
@@ -30,14 +28,16 @@
     <div class="search-box">
       <div class="search-row">
         <div class="search-input-wrapper">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Enter swimmer name (e.g., BOUGH, Smith)..."
-            autocomplete="off"
-            @input="onSearchInput"
-            @keypress.enter="doSearch"
-          />
+          <div class="search-input-container">
+            <input v-model="searchQuery" type="text" placeholder="Enter swimmer name (e.g., BOUGH, Smith)..."
+              autocomplete="off" @input="onSearchInput" @keypress.enter="doSearch" />
+            <div v-if="suggestions.length" class="suggestions">
+              <div v-for="s in suggestions" :key="s.name" class="suggestion-item"
+                @click="selectSuggestion(s.displayName)">
+                {{ s.displayName }} <span style="color:#666">- {{ s.club || 'Unknown' }}</span>
+              </div>
+            </div>
+          </div>
           <select v-model="clubFilter" @change="doSearch">
             <option value="">All Clubs</option>
             <option v-for="club in sortedClubs" :key="club" :value="club">{{ club }}</option>
@@ -57,90 +57,88 @@
         </span>
       </div>
 
-      <div v-if="suggestions.length" class="suggestions">
-        <div
-          v-for="s in suggestions"
-          :key="s.name"
-          class="suggestion-item"
-          @click="selectSuggestion(s.displayName)"
-        >
-          {{ s.displayName }} <span style="color:#666">- {{ s.club || 'Unknown' }}</span>
-        </div>
-      </div>
-
       <div v-if="gala?.last_updated" class="status-bar">
         <span>Last updated: {{ new Date(gala.last_updated).toLocaleTimeString() }}</span>
       </div>
     </div>
 
     <div v-if="upcomingHeats.length" class="heat-strip">
-      <div v-for="(h, i) in upcomingHeats" :key="`${h.eventId}-${h.heat}`" :class="['heat-strip-item', i === 0 ? 'heat-current' : '']">
-        <div class="heat-strip-label">{{ i === 0 ? 'NOW' : h.estimatedStart ? `~${formatHeatTime(h.estimatedStart)}` : `+${i}` }}</div>
-        <div class="heat-strip-event">{{ h.eventName }}</div>
-        <div class="heat-strip-heat">Heat {{ h.heat }}</div>
-      </div>
-    </div>
-
-    <div v-if="!activeNameFilter && !activeClubFilter" class="no-results">
-      <div class="no-results-icon">🏊</div>
-      <p>Enter a swimmer's name or select a club to view results</p>
-    </div>
-
-    <div v-else-if="searchMatches.length === 0" class="no-results">
-      <div class="no-results-icon">🔍</div>
-      <p>No swimmers found matching your search</p>
-    </div>
-
-    <template v-else>
-      <div v-if="activeClubFilter && searchMatches.length > 1" class="club-summary">
-        <h3>🏊 {{ activeClubFilter }} — {{ searchMatches.length }} Swimmers</h3>
-        <div class="swimmer-stats" style="margin-bottom:15px;">
-          <div class="stat-box"><div class="stat-value">{{ clubTotalRaces }}</div><div class="stat-label">Races</div></div>
-          <div class="stat-box"><div class="stat-value">{{ clubTotalGolds }}</div><div class="stat-label">1st</div></div>
-          <div class="stat-box"><div class="stat-value">{{ clubTotalMedals }}</div><div class="stat-label">Medals</div></div>
-        </div>
-        <div class="club-swimmers-grid">
-          <div v-for="s in searchMatches" :key="s.name" class="club-swimmer-item" @click="selectSwimmer(s.data.displayName)">
-            <div class="club-swimmer-name">{{ s.data.displayName }}</div>
-            <div class="club-swimmer-stats">{{ s.data.results.length }} races • {{ s.data.results.filter(r => r.place === '1').length }} wins</div>
-          </div>
-        </div>
-
-        <div v-if="clubUpcomingRaces.length" class="club-upcoming">
-          <h4>Upcoming Races</h4>
-          <div v-for="race in clubUpcomingRaces" :key="`${race.eventId}-${race.heat}`" class="club-upcoming-row">
-            <div class="club-upcoming-time">
-              <span v-if="race.estimatedStart" class="est-time">~{{ formatHeatTime(race.estimatedStart) }}</span>
-              <span v-else class="est-time no-time">—</span>
-            </div>
-            <div class="club-upcoming-event">{{ race.eventName }} · Heat {{ race.heat }}</div>
-            <div class="club-upcoming-swimmers">
-              <span v-for="s in race.swimmers.sort((a,b) => parseInt(a.lane)-parseInt(b.lane))" :key="s.displayName" class="club-upcoming-swimmer">
-                {{ s.displayName }}<span class="swimmer-lane">Ln {{ s.lane }}</span>
-              </span>
-            </div>
-          </div>
+      <div v-for="(h, i) in upcomingHeats" :key="`${h.eventId}-${h.heat}`"
+        :class="['heat-strip-item', i === 0 ? 'heat-current' : '']">
+        <div class="heat-strip-label">{{ (i === 0 && (!h.estimatedStart || h.estimatedStart <= now)) ? 'NOW' :
+          h.estimatedStart ? `~${formatHeatTime(h.estimatedStart)}` : `+${i}` }}</div>
+            <div class="heat-strip-event">{{ h.eventName }}</div>
+            <div class="heat-strip-heat">Heat {{ h.heat }}</div>
         </div>
       </div>
 
-      <SwimmerCard
-        v-for="{ name, data } in displayMatches"
-        :key="name"
-        :data="data"
-        :heat-schedule="heatSchedule"
-        :age-group-counts="ageGroupCounts"
-        @filter-club="filterByClub"
-      />
+      <div v-if="!activeNameFilter && !activeClubFilter" class="no-results">
+        <div class="no-results-icon">🏊</div>
+        <p>Enter a swimmer's name or select a club to view results</p>
+      </div>
 
-      <p v-if="activeClubFilter && searchMatches.length > 10" style="text-align:center;color:#888;">
-        Showing 10 of {{ searchMatches.length }} swimmers. Search by name to see specific swimmers.
-      </p>
-    </template>
+      <div v-else-if="searchMatches.length === 0" class="no-results">
+        <div class="no-results-icon">🔍</div>
+        <p>No swimmers found matching your search</p>
+      </div>
 
-    <footer class="app-footer">
-      Open source &mdash; <a href="https://github.com/tombartindale/gala-tracker" target="_blank" rel="noopener">github.com/tombartindale/gala-tracker</a>
-    </footer>
-  </div>
+      <template v-else>
+        <div v-if="activeClubFilter && searchMatches.length > 1" class="club-summary">
+          <h3>🏊 {{ activeClubFilter }} — {{ searchMatches.length }} Swimmers</h3>
+          <div class="swimmer-stats" style="margin-bottom:15px;">
+            <div class="stat-box">
+              <div class="stat-value">{{ clubTotalRaces }}</div>
+              <div class="stat-label">Races</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">{{ clubTotalGolds }}</div>
+              <div class="stat-label">1st</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">{{ clubTotalMedals }}</div>
+              <div class="stat-label">Medals</div>
+            </div>
+          </div>
+          <div class="club-swimmers-grid">
+            <div v-for="s in searchMatches" :key="s.name" class="club-swimmer-item"
+              @click="selectSwimmer(s.data.displayName)">
+              <div class="club-swimmer-name">{{ s.data.displayName }}</div>
+              <div class="club-swimmer-stats">{{ s.data.results.length }} races • {{s.data.results.filter(r => r.place
+                === '1').length }} wins</div>
+            </div>
+          </div>
+
+          <div v-if="clubUpcomingRaces.length" class="club-upcoming">
+            <h4>Upcoming Races</h4>
+            <div v-for="race in clubUpcomingRaces" :key="`${race.eventId}-${race.heat}`" class="club-upcoming-row">
+              <div class="club-upcoming-time">
+                <span v-if="race.estimatedStart" class="est-time">~{{ formatHeatTime(race.estimatedStart) }}</span>
+                <span v-else class="est-time no-time">—</span>
+              </div>
+              <div class="club-upcoming-event">{{ race.eventName }} · Heat {{ race.heat }}</div>
+              <div class="club-upcoming-swimmers">
+                <span v-for="s in race.swimmers.sort((a, b) => parseInt(a.lane) - parseInt(b.lane))"
+                  :key="s.displayName" class="club-upcoming-swimmer">
+                  {{ s.displayName }}<span class="swimmer-lane">Ln {{ s.lane }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <SwimmerCard v-for="{ name, data } in displayMatches" :key="name" :data="data" :heat-schedule="heatSchedule"
+          :age-group-counts="ageGroupCounts" @filter-club="filterByClub" />
+
+        <p v-if="activeClubFilter && searchMatches.length > 10" style="text-align:center;color:#888;">
+          Showing 10 of {{ searchMatches.length }} swimmers. Search by name to see specific swimmers.
+        </p>
+      </template>
+
+      <footer class="app-footer">
+        Open source &mdash; <a href="https://github.com/tombartindale/gala-tracker" target="_blank"
+          rel="noopener">github.com/tombartindale/gala-tracker</a>
+      </footer>
+    </div>
 </template>
 
 <script setup lang="ts">
@@ -170,6 +168,7 @@ function parseRelayCode(name: string) {
 const HEAT_DURATION: Record<string, number> = { '50m': 3.5, '100m': 5.5, 'default': 4.5 }
 const HEAT_OVERHEAD = 0.75 // minutes added per heat beyond the slowest swim time (blocks, start, recovery)
 const EVENT_BUFFER = 2
+const DEFAULT_WARMUP_MINS = 90 // fallback if not specified on the gala document (warmup_mins field)
 
 // ── Firestore bindings ────────────────────────────────────────────────────────
 
@@ -177,6 +176,14 @@ interface GalaConfig { gala_id: string; race_dates: string[] }
 const config = useDocument<{ galas: GalaConfig[] }>(doc(db, 'config', 'scraper'))
 
 function todayUK() { return new Date().toLocaleDateString('en-GB') }
+
+function formatGalaName(id: string): string {
+  return id
+    .replace(/-\d{4}$/, '')
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
 
 function formatGalaDates(dates: string[]): string {
   if (!dates.length) return ''
@@ -207,7 +214,8 @@ const allGalas = computed(() =>
   (config.value?.galas ?? []).map(g => ({
     gala_id: g.gala_id,
     isToday: g.race_dates.includes(todayUK()),
-    label: formatGalaDates(g.race_dates),
+    name: formatGalaName(g.gala_id),
+    dates: formatGalaDates(g.race_dates),
   }))
 )
 
@@ -323,18 +331,22 @@ const heatSchedule = computed<HeatScheduleItem[]>(() => {
     const dp = date.match(/^(\d+)\/(\d+)\/(\d+)$/)
     const tp = time.match(/^(\d+):(\d+)$/)
     if (!dp || !tp) return null
-    return new Date(parseInt(dp[3]), parseInt(dp[2]) - 1, parseInt(dp[1]), parseInt(tp[1]), parseInt(tp[2]))
+    const year = parseInt(dp[3]); const fullYear = year < 100 ? 2000 + year : year
+    return new Date(fullYear, parseInt(dp[2]) - 1, parseInt(dp[1]), parseInt(tp[1]), parseInt(tp[2]))
   }
 
   // Build groups: one per session (in session order), plus orphan events
   type Group = { sessionStart: Date | null; eventIds: string[] }
   const groups: Group[] = []
 
-  if (sessions.length) {
+if (sessions.length) {
     const allSessionEventIds = new Set(sessions.flatMap(s => s.events))
     for (const s of [...sessions].sort((a, b) => a.session_number - b.session_number)) {
       const ids = eventOrder.filter(id => s.events.includes(id))
-      groups.push({ sessionStart: parseSessionStart(s.date, s.start_time), eventIds: ids })
+      const rawStart = parseSessionStart(s.date, s.start_time)
+      const warmupMins = (gala.value as any)?.warmup_mins ?? DEFAULT_WARMUP_MINS
+      const sessionStart = rawStart ? new Date(rawStart.getTime() + warmupMins * 60_000) : null
+groups.push({ sessionStart, eventIds: ids })
     }
     const orphans = eventOrder.filter(id => !allSessionEventIds.has(id))
     if (orphans.length) groups.push({ sessionStart: null, eventIds: orphans })
@@ -378,18 +390,43 @@ const heatSchedule = computed<HeatScheduleItem[]>(() => {
         const estimatedStart = sessionStart
           ? new Date(sessionStart.getTime() + cumulativeMins * 60 * 1000)
           : null
-        schedule.push({ eventId, heat, eventName, isComplete, estimatedTime: cumulativeMins, heatDuration, estimatedStart })
+        schedule.push({ eventId, heat, eventName, isComplete, estimatedTime: cumulativeMins, heatDuration, estimatedStart, sessionStart })
         cumulativeMins += heatDuration
       }
       if (heats.length) cumulativeMins += EVENT_BUFFER
     }
   }
 
-  // Determine which heat within the current event is running now.
-  // Strategy: use the scrape timestamp of the last completed event's results as a real-clock
-  // anchor for when the current event started — far more reliable than accumulating durations
-  // from session start, which compounds errors across every preceding event.
   const nowMs = now.value.getTime()
+
+  // Mark all heats from sessions that have definitively ended — i.e. when the next session's
+  // start time has already passed. This covers the "no results yet" case for earlier sessions.
+  let si = 0
+  while (si < schedule.length) {
+    const curSession = schedule[si].sessionStart
+    let sj = si
+    while (sj < schedule.length && schedule[sj].sessionStart === curSession) sj++
+    if (sj >= schedule.length) break
+    const nextSession = schedule[sj].sessionStart
+    if (nextSession && nextSession.getTime() <= nowMs) {
+      for (let k = si; k < sj; k++) schedule[k].isComplete = true
+      si = sj
+    } else break
+  }
+
+  // Advance through heats in the current session based on estimated start times.
+  // Each heat's estimatedStart + heatDuration tells us when it should have finished.
+  // This works before any results arrive, using session start + warmup as the anchor.
+  for (let i = 0; i < schedule.length; i++) {
+    const h = schedule[i]
+    if (h.isComplete) continue
+    if (h.estimatedStart && h.estimatedStart.getTime() + h.heatDuration * 60_000 <= nowMs) {
+      h.isComplete = true
+    } else break
+  }
+
+  // Determine which heat within the current event is running now.
+  // Use the scrape timestamp of the last completed event's results as a real-clock anchor.
   const firstEventIncomplete = schedule.findIndex(h => !h.isComplete)
   if (firstEventIncomplete !== -1) {
     const lastCompleteEventId = firstEventIncomplete > 0 ? schedule[firstEventIncomplete - 1].eventId : null
@@ -399,9 +436,12 @@ const heatSchedule = computed<HeatScheduleItem[]>(() => {
       : NaN
 
     if (!isNaN(lastScrapedMs)) {
-      // Current event started some time after the scraper last saw the previous event's results.
-      // Use scrape time + a small buffer as our best estimate of event start.
-      const currentEventStartMs = lastScrapedMs + EVENT_BUFFER * 60_000
+      let currentEventStartMs = lastScrapedMs + EVENT_BUFFER * 60_000
+      // Clamp forward if session-based start is later (inter-session break)
+      const firstHeatSessionStart = schedule[firstEventIncomplete].estimatedStart
+      if (firstHeatSessionStart && firstHeatSessionStart.getTime() > currentEventStartMs) {
+        currentEventStartMs = firstHeatSessionStart.getTime()
+      }
       const timeIntoEventMs = Math.max(0, nowMs - currentEventStartMs)
       const currentEventId = schedule[firstEventIncomplete].eventId
       let cumulativeMs = 0
@@ -410,20 +450,23 @@ const heatSchedule = computed<HeatScheduleItem[]>(() => {
         if (cumulativeMs + heatMs <= timeIntoEventMs) {
           schedule[i].isComplete = true
           cumulativeMs += heatMs
-        } else {
-          break
-        }
+        } else break
       }
     }
   }
 
-  // Anchor the current heat (first still-incomplete) to now so past drift doesn't compound
+  // Anchor the current heat to now so accumulated duration drift doesn't compound.
+  // Skip if the session-based start is still in the future — racing hasn't begun yet.
   const firstIncomplete = schedule.findIndex(h => !h.isComplete)
   if (firstIncomplete !== -1) {
-    const baseOffset = schedule[firstIncomplete].estimatedTime
-    for (let i = firstIncomplete; i < schedule.length; i++) {
-      const relativeMs = (schedule[i].estimatedTime - baseOffset) * 60_000
-      schedule[i].estimatedStart = new Date(nowMs + relativeMs)
+    const sessionBasedStart = schedule[firstIncomplete].estimatedStart
+    const sessionInFuture = sessionBasedStart !== null && sessionBasedStart.getTime() > nowMs
+    if (!sessionInFuture) {
+      const baseOffset = schedule[firstIncomplete].estimatedTime
+      for (let i = firstIncomplete; i < schedule.length; i++) {
+        const relativeMs = (schedule[i].estimatedTime - baseOffset) * 60_000
+        schedule[i].estimatedStart = new Date(nowMs + relativeMs)
+      }
     }
   }
 
@@ -482,7 +525,7 @@ const upcomingHeats = computed(() => {
 
 const clubTotalRaces = computed(() => searchMatches.value.reduce((s, m) => s + m.data.results.filter(r => !r.time?.includes('DNA')).length, 0))
 const clubTotalGolds = computed(() => searchMatches.value.reduce((s, m) => s + m.data.results.filter(r => r.place === '1').length, 0))
-const clubTotalMedals = computed(() => searchMatches.value.reduce((s, m) => s + m.data.results.filter(r => ['1','2','3'].includes(r.place)).length, 0))
+const clubTotalMedals = computed(() => searchMatches.value.reduce((s, m) => s + m.data.results.filter(r => ['1', '2', '3'].includes(r.place)).length, 0))
 
 const clubUpcomingRaces = computed(() => {
   if (!activeClubFilter.value) return []
@@ -570,94 +613,640 @@ function formatHeatTime(d: Date) { return d.toLocaleTimeString([], { hour: '2-di
 </script>
 
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #e4e4e4; padding: 20px; }
-.container { max-width: 1100px; margin: 0 auto; }
-header { text-align: center; margin-bottom: 30px; }
-.app-label { color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-h1 { font-size: 2.5rem; color: #00d9ff; margin-bottom: 10px; }
-.search-box { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-.search-row { display: flex; gap: 10px; margin-bottom: 15px; }
-.search-input-wrapper { flex: 1; display: flex; gap: 10px; }
-input[type=text] { flex: 1; padding: 15px 20px; font-size: 1.1rem; border: 2px solid rgba(0,217,255,0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; outline: none; transition: border-color 0.3s; }
-input[type=text]:focus { border-color: #00d9ff; }
-input[type=text]::placeholder { color: #666; }
-select { padding: 15px 20px; font-size: 1rem; border: 2px solid rgba(0,217,255,0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; outline: none; min-width: 180px; cursor: pointer; }
-select option { background: #1a1a2e; }
-.btn { padding: 15px 30px; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
-.btn-primary { background: #00d9ff; color: #1a1a2e; }
-.btn-primary:hover { background: #00b8d9; transform: translateY(-2px); }
-.filter-tags { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; min-height: 24px; }
-.filter-tag { background: rgba(0,217,255,0.2); color: #00d9ff; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
-.filter-tag .remove { cursor: pointer; opacity: 0.7; }
-.filter-tag .remove:hover { opacity: 1; }
-.status-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem; color: #666; }
-.status-indicator { display: flex; align-items: center; gap: 8px; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
-.status-dot.loading { background: #ffc107; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.suggestions { background: rgba(0,0,0,0.3); border-radius: 8px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
-.suggestion-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s; }
-.suggestion-item:hover { background: rgba(0,217,255,0.1); }
-.no-results { text-align: center; padding: 60px 20px; color: #666; }
-.no-results-icon { font-size: 4rem; margin-bottom: 20px; }
-.club-summary { background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-.club-summary h3 { color: #ffc107; margin-bottom: 15px; }
-.club-swimmers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.club-swimmer-item { background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-.club-swimmer-item:hover { background: rgba(0,217,255,0.1); }
-.club-swimmer-name { font-weight: 500; color: #fff; }
-.club-swimmer-stats { font-size: 0.8rem; color: #888; }
-.swimmer-stats { display: flex; gap: 15px; text-align: center; flex-wrap: wrap; }
-.stat-box { background: rgba(0,217,255,0.1); padding: 12px 16px; border-radius: 8px; min-width: 70px; }
-.stat-value { font-size: 1.4rem; font-weight: 700; color: #00d9ff; }
-.stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
-.heat-strip { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
-.heat-strip-item { flex: 0 0 auto; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 14px; min-width: 130px; }
-.heat-strip-item.heat-current { background: rgba(0,217,255,0.12); border-color: rgba(0,217,255,0.4); }
-.heat-strip-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #888; margin-bottom: 4px; }
-.heat-strip-item.heat-current .heat-strip-label { color: #00d9ff; }
-.heat-strip-event { font-size: 0.82rem; color: #ddd; font-weight: 500; line-height: 1.3; margin-bottom: 2px; }
-.heat-strip-heat { font-size: 0.75rem; color: #666; }
-.heat-strip-item.heat-current .heat-strip-heat { color: #aaa; }
-.club-upcoming { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; }
-.club-upcoming h4 { color: #ffc107; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-.club-upcoming-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); flex-wrap: wrap; }
-.club-upcoming-row:last-child { border-bottom: none; }
-.club-upcoming-time { flex: 0 0 60px; }
-.est-time { font-size: 0.8rem; font-weight: 600; color: #aaa; font-variant-numeric: tabular-nums; }
-.est-time::before { content: ''; }
-.no-time { color: #555; }
-.club-upcoming-event { flex: 0 0 auto; font-size: 0.85rem; color: #ddd; white-space: nowrap; }
-.club-upcoming-swimmers { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
-.club-upcoming-swimmer { font-size: 0.82rem; color: #fff; background: rgba(0,217,255,0.1); padding: 2px 8px; border-radius: 12px; display: flex; align-items: center; gap: 5px; }
-.swimmer-lane { font-size: 0.7rem; color: #888; }
-.gala-nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-.gala-nav-item { padding: 5px 14px; border-radius: 20px; font-size: 0.82rem; color: #888; border: 1px solid rgba(255,255,255,0.1); text-decoration: none; transition: all 0.2s; }
-.gala-nav-item:hover { color: #ddd; border-color: rgba(255,255,255,0.25); }
-.gala-nav-item.active { color: #00d9ff; border-color: rgba(0,217,255,0.5); background: rgba(0,217,255,0.08); }
-.historical-banner { background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.25); border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; font-size: 0.88rem; color: #b8960a; text-align: center; }
-.historical-banner a { color: #ffc107; text-decoration: none; font-weight: 600; }
-.historical-banner a:hover { text-decoration: underline; }
-.info-banner { background: rgba(0,217,255,0.08); border: 1px solid rgba(0,217,255,0.25); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
-.info-banner-content { display: flex; align-items: center; gap: 12px; }
-.info-banner-text { flex: 1; font-size: 0.9rem; color: #b0e8f0; line-height: 1.5; }
-.info-banner-text strong { color: #00d9ff; display: block; margin-bottom: 2px; }
-.info-banner-close { background: none; border: none; color: #666; font-size: 1rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; flex-shrink: 0; transition: color 0.2s; }
-.info-banner-close:hover { color: #aaa; }
-@media (max-width: 768px) {
-  body { padding: 10px; }
-  h1 { font-size: 1.8rem; }
-  .search-row, .search-input-wrapper { flex-direction: column; }
-  select { width: 100%; min-width: unset; }
-  .club-upcoming-event { white-space: normal; }
-  .club-upcoming-row { gap: 8px; }
-  .club-swimmers-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .swimmer-stats { gap: 8px; }
-  .stat-box { padding: 10px 12px; min-width: 60px; }
-  .stat-value { font-size: 1.2rem; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
-.app-footer { text-align: center; margin-top: 40px; padding: 20px; font-size: 0.8rem; color: #444; }
-.app-footer a { color: #666; text-decoration: none; }
-.app-footer a:hover { color: #888; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  min-height: 100vh;
+  color: #e4e4e4;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.app-label {
+  color: #888;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 2.5rem;
+  color: #00d9ff;
+  margin-bottom: 10px;
+}
+
+.search-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.search-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+input[type=text] {
+  flex: 1;
+  padding: 15px 20px;
+  font-size: 1.1rem;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+input[type=text]:focus {
+  border-color: #00d9ff;
+}
+
+input[type=text]::placeholder {
+  color: #666;
+}
+
+select {
+  padding: 15px 20px;
+  font-size: 1rem;
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  outline: none;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+select option {
+  background: #1a1a2e;
+}
+
+.btn {
+  padding: 15px 30px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: #00d9ff;
+  color: #1a1a2e;
+}
+
+.btn-primary:hover {
+  background: #00b8d9;
+  transform: translateY(-2px);
+}
+
+.filter-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 24px;
+}
+
+.filter-tag {
+  background: rgba(0, 217, 255, 0.2);
+  color: #00d9ff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-tag .remove {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.filter-tag .remove:hover {
+  opacity: 1;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+  animation: pulse 2s infinite;
+}
+
+.status-dot.loading {
+  background: #ffc107;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.search-input-container {
+  flex: 1;
+  position: relative;
+}
+
+.search-input-container input {
+  width: 100%;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: #1a1a2e;
+  border: 1px solid rgba(0, 217, 255, 0.3);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.suggestion-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+
+.suggestion-item:hover {
+  background: rgba(0, 217, 255, 0.1);
+}
+
+.no-results {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.no-results-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.club-summary {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.club-summary h3 {
+  color: #ffc107;
+  margin-bottom: 15px;
+}
+
+.club-swimmers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.club-swimmer-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.club-swimmer-item:hover {
+  background: rgba(0, 217, 255, 0.1);
+}
+
+.club-swimmer-name {
+  font-weight: 500;
+  color: #fff;
+}
+
+.club-swimmer-stats {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.swimmer-stats {
+  display: flex;
+  gap: 15px;
+  text-align: center;
+  flex-wrap: wrap;
+}
+
+.stat-box {
+  background: rgba(0, 217, 255, 0.1);
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 70px;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #00d9ff;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.heat-strip {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.heat-strip-item {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 130px;
+}
+
+.heat-strip-item.heat-current {
+  background: rgba(0, 217, 255, 0.12);
+  border-color: rgba(0, 217, 255, 0.4);
+}
+
+.heat-strip-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.heat-strip-item.heat-current .heat-strip-label {
+  color: #00d9ff;
+}
+
+.heat-strip-event {
+  font-size: 0.82rem;
+  color: #ddd;
+  font-weight: 500;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+
+.heat-strip-heat {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.heat-strip-item.heat-current .heat-strip-heat {
+  color: #aaa;
+}
+
+.club-upcoming {
+  margin-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 16px;
+}
+
+.club-upcoming h4 {
+  color: #ffc107;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.club-upcoming-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-wrap: wrap;
+}
+
+.club-upcoming-row:last-child {
+  border-bottom: none;
+}
+
+.club-upcoming-time {
+  flex: 0 0 60px;
+}
+
+.est-time {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #aaa;
+  font-variant-numeric: tabular-nums;
+}
+
+.est-time::before {
+  content: '';
+}
+
+.no-time {
+  color: #555;
+}
+
+.club-upcoming-event {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  color: #ddd;
+  white-space: nowrap;
+}
+
+.club-upcoming-swimmers {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.club-upcoming-swimmer {
+  font-size: 0.82rem;
+  color: #fff;
+  background: rgba(0, 217, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.swimmer-lane {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.gala-nav {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.gala-nav-item {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  color: #888;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-decoration: none;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.gala-nav-name {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.gala-nav-dates {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  line-height: 1.2;
+}
+
+.gala-nav-item:hover {
+  color: #ddd;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.gala-nav-item.active {
+  color: #00d9ff;
+  border-color: rgba(0, 217, 255, 0.5);
+  background: rgba(0, 217, 255, 0.08);
+}
+
+.historical-banner {
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  font-size: 0.88rem;
+  color: #b8960a;
+  text-align: center;
+}
+
+.historical-banner a {
+  color: #ffc107;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.historical-banner a:hover {
+  text-decoration: underline;
+}
+
+.info-banner {
+  background: rgba(0, 217, 255, 0.08);
+  border: 1px solid rgba(0, 217, 255, 0.25);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+
+.info-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.info-banner-text {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #b0e8f0;
+  line-height: 1.5;
+}
+
+.info-banner-text strong {
+  color: #00d9ff;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.info-banner-close {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.info-banner-close:hover {
+  color: #aaa;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 8px;
+  }
+
+  header {
+    margin-bottom: 12px;
+  }
+
+  .app-label {
+    display: none;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+  }
+
+  .gala-nav {
+    margin-top: 8px;
+    gap: 6px;
+  }
+
+  .gala-nav-item {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
+
+  .search-box {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .search-row {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .search-input-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  input[type=text] {
+    padding: 10px 12px;
+    font-size: 1rem;
+  }
+
+  select {
+    width: 100%;
+    min-width: unset;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+  }
+
+  .club-upcoming-event {
+    white-space: normal;
+  }
+
+  .club-upcoming-row {
+    gap: 8px;
+  }
+
+  .club-swimmers-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .swimmer-stats {
+    gap: 8px;
+  }
+
+  .stat-box {
+    padding: 10px 12px;
+    min-width: 60px;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+}
+
+.app-footer {
+  text-align: center;
+  margin-top: 40px;
+  padding: 20px;
+  font-size: 0.8rem;
+  color: #444;
+}
+
+.app-footer a {
+  color: #666;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: #888;
+}
 </style>
