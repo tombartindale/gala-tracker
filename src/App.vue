@@ -279,6 +279,7 @@ const allSwimmers = computed<Map<string, SwimmerData>>(() => {
 
   for (const results of Object.values(allResults.value)) {
     for (const r of results) {
+      if (/^\d+m\b/i.test(r.name)) continue
       const key = r.name.toUpperCase()
       const relay = isRelayCode(r.name)
       const club = normalizeClub(r.club)
