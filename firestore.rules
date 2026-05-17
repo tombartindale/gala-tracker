@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Frontend reads config and gala data directly — no client writes
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /galas/{galaId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /galas/{galaId}/{subcollection}/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

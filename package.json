@@ -1,0 +1,25 @@
+{
+  "name": "gala-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "emulate": "npm --prefix functions run build && concurrently --kill-others \"npm --prefix functions run watch\" \"firebase emulators:start --import ./emulator-data --export-on-exit ./emulator-data\"",
+    "poll": "curl -s -X POST http://127.0.0.1:5001/gala-tracker/us-central1/pollSwimResultsHttp | cat",
+    "seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "firebase": "^10.0.0",
+    "vue": "^3.5.0",
+    "vuefire": "^3.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "concurrently": "^9.2.1",
+    "firebase-admin": "^13.10.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}

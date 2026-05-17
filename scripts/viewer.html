@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swim Results Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .search-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-input-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        #swimmerSearch {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            border: 2px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #swimmerSearch:focus {
+            border-color: #00d9ff;
+        }
+
+        #swimmerSearch::placeholder {
+            color: #666;
+        }
+
+        #clubFilter {
+            padding: 15px 20px;
+            font-size: 1rem;
+            border: 2px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            outline: none;
+            min-width: 180px;
+            cursor: pointer;
+        }
+
+        #clubFilter option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #00d9ff;
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover {
+            background: #00b8d9;
+            transform: translateY(-2px);
+        }
+
+        .btn-refresh {
+            background: rgba(255, 255, 255, 0.1);
+            color: #00d9ff;
+            border: 2px solid #00d9ff;
+        }
+
+        .btn-refresh:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-tag {
+            background: rgba(0, 217, 255, 0.2);
+            color: #00d9ff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-tag .remove {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .filter-tag .remove:hover {
+            opacity: 1;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .swimmer-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .swimmer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .swimmer-name {
+            font-size: 1.8rem;
+            color: #00d9ff;
+            margin-bottom: 5px;
+        }
+
+        .swimmer-club {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .club-badge {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .club-badge:hover {
+            background: rgba(255, 193, 7, 0.3);
+        }
+
+        .swimmer-stats {
+            display: flex;
+            gap: 15px;
+            text-align: center;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 12px 16px;
+            border-radius: 8px;
+            min-width: 70px;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00d9ff;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            color: #fff;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: #00d9ff;
+            border-radius: 2px;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        .results-table th {
+            text-align: left;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #888;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .results-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .results-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .event-name {
+            font-weight: 500;
+        }
+
+        .time {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 1.1rem;
+            color: #00d9ff;
+        }
+
+        .place-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .place {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .place-1 { background: linear-gradient(135deg, #ffd700, #ffb700); color: #000; }
+        .place-2 { background: linear-gradient(135deg, #c0c0c0, #a0a0a0); color: #000; }
+        .place-3 { background: linear-gradient(135deg, #cd7f32, #a0522d); color: #fff; }
+        .place-other { background: rgba(255, 255, 255, 0.1); color: #888; }
+
+        .place-context {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .dq-badge {
+            background: #ff4757;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Timeline styles */
+        .timeline-section {
+            background: rgba(0, 217, 255, 0.05);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .timeline-title {
+            font-size: 1.1rem;
+            color: #00d9ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .current-event-badge {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            animation: pulse 2s infinite;
+        }
+
+        .timeline-container {
+            position: relative;
+            padding: 10px 0;
+        }
+
+        .timeline-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #00d9ff);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .timeline-markers {
+            position: relative;
+            margin-top: 10px;
+            height: 60px;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        .marker-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 auto 5px;
+        }
+
+        .marker-dot.completed {
+            background: #4caf50;
+        }
+
+        .marker-dot.current {
+            background: #00d9ff;
+            box-shadow: 0 0 10px #00d9ff;
+            animation: pulse 1s infinite;
+        }
+
+        .marker-dot.upcoming {
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid #00d9ff;
+        }
+
+        .marker-dot.swimmer-race {
+            background: #ffc107;
+            box-shadow: 0 0 10px #ffc107;
+        }
+
+        .marker-label {
+            font-size: 0.7rem;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .marker-time {
+            font-size: 0.75rem;
+            color: #00d9ff;
+            font-weight: 600;
+        }
+
+        .eta-display {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .eta-label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .eta-time {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffc107;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .eta-detail {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .upcoming-race {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .upcoming-race-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .upcoming-race .event-info {
+            flex: 1;
+        }
+
+        .upcoming-race .event-name {
+            color: #4caf50;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .upcoming-race .heat-info {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .lane-badge {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .seed-time {
+            color: #888;
+            font-size: 0.85rem;
+            margin-left: 10px;
+        }
+
+        .eta-badge {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .heats-remaining {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .no-results-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .suggestions {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .suggestions.active {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .age-group-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .points {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .club-summary {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .club-summary h3 {
+            color: #ffc107;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .club-swimmers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .club-swimmer-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .club-swimmer-item:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .club-swimmer-name {
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .club-swimmer-stats {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .search-row { flex-direction: column; }
+            .search-input-wrapper { flex-direction: column; }
+            .swimmer-header { flex-direction: column; gap: 15px; }
+            .swimmer-stats { width: 100%; justify-content: space-around; }
+            .results-table { font-size: 0.9rem; }
+            .results-table th, .results-table td { padding: 10px 8px; }
+            #clubFilter { width: 100%; }
+            .eta-time { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Swim Results Tracker</h1>
+            <p class="subtitle">TASC Junior Invitational 2026</p>
+        </header>
+
+        <div class="search-box">
+            <div class="search-row">
+                <div class="search-input-wrapper">
+                    <input type="text" id="swimmerSearch" placeholder="Enter swimmer name (e.g., BOUGH, Smith)..." autocomplete="off">
+                    <select id="clubFilter">
+                        <option value="">All Clubs</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="searchSwimmer()">Search</button>
+                <button class="btn btn-refresh" onclick="refreshData()">Refresh</button>
+            </div>
+            <div id="activeFilters" class="filter-tags"></div>
+            <div id="suggestions" class="suggestions"></div>
+            <div class="status-bar">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="statusText">Ready</span>
+                </div>
+                <span id="lastUpdate">Last updated: --</span>
+            </div>
+        </div>
+
+        <div id="results">
+            <div class="no-results">
+                <div class="no-results-icon">🏊</div>
+                <p>Enter a swimmer's name or select a club to view results</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = null;
+        let allSwimmers = new Map();
+        let allClubs = new Set();
+        let ageGroupCounts = {};
+        let eventOrder = [];
+        let heatSchedule = []; // { eventId, heat, eventName, isComplete, estimatedTime }
+
+        // Estimated minutes per heat by event type
+        const HEAT_DURATION = {
+            '50m': 2.5,    // 50m events: ~2.5 min per heat
+            '100m': 4.0,   // 100m events: ~4 min per heat
+            'default': 3.5
+        };
+
+        // Buffer between events
+        const EVENT_BUFFER = 2; // minutes between events
+
+        async function loadData() {
+            updateStatus('Loading data...');
+            try {
+                const response = await fetch('swim_results.json');
+                if (response.ok) {
+                    allData = await response.json();
+                    processData();
+                    buildHeatSchedule();
+                    populateClubFilter();
+                    updateStatus('Data loaded');
+                    document.getElementById('lastUpdate').textContent =
+                        `Last updated: ${new Date(allData.last_updated).toLocaleTimeString()}`;
+                } else {
+                    throw new Error('Could not load data file');
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                updateStatus('Error loading data - run swim_tracker.py first');
+            }
+        }
+
+        function getEventDuration(eventName) {
+            if (eventName.includes('50m')) return HEAT_DURATION['50m'];
+            if (eventName.includes('100m')) return HEAT_DURATION['100m'];
+            return HEAT_DURATION['default'];
+        }
+
+        function buildHeatSchedule() {
+            heatSchedule = [];
+            if (!allData || !allData.events || !allData.start_lists) return;
+
+            // Get events in order
+            eventOrder = Object.keys(allData.events).sort((a, b) => parseInt(a) - parseInt(b));
+
+            let cumulativeTime = 0;
+
+            for (const eventId of eventOrder) {
+                const eventName = allData.events[eventId];
+                const startList = allData.start_lists[eventId] || [];
+                const results = allData.all_results[eventId] || [];
+                const isComplete = results.length > 0;
+
+                // Get unique heats for this event
+                const heats = [...new Set(startList.map(e => e.heat))].sort((a, b) => parseInt(a) - parseInt(b));
+                const heatDuration = getEventDuration(eventName);
+
+                for (const heat of heats) {
+                    heatSchedule.push({
+                        eventId,
+                        heat,
+                        eventName,
+                        isComplete,
+                        estimatedTime: cumulativeTime,
+                        heatDuration
+                    });
+                    cumulativeTime += heatDuration;
+                }
+
+                // Add buffer between events
+                if (heats.length > 0) {
+                    cumulativeTime += EVENT_BUFFER;
+                }
+            }
+        }
+
+        function getCurrentHeatIndex() {
+            // Find the first incomplete heat
+            for (let i = 0; i < heatSchedule.length; i++) {
+                if (!heatSchedule[i].isComplete) {
+                    return i;
+                }
+            }
+            return heatSchedule.length; // All complete
+        }
+
+        function getHeatETA(eventId, heat) {
+            const currentIdx = getCurrentHeatIndex();
+            const targetIdx = heatSchedule.findIndex(h => h.eventId === eventId && h.heat === heat);
+
+            if (targetIdx === -1 || targetIdx < currentIdx) return null;
+
+            // Calculate time from current heat to target
+            let minutes = 0;
+            for (let i = currentIdx; i < targetIdx; i++) {
+                minutes += heatSchedule[i].heatDuration;
+            }
+
+            return minutes;
+        }
+
+        function formatETA(minutes) {
+            if (minutes === null || minutes === undefined) return '--';
+            if (minutes <= 0) return 'Now!';
+
+            const hrs = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+
+            if (hrs > 0) {
+                return `${hrs}h ${mins}m`;
+            }
+            return `${mins} min`;
+        }
+
+        function getHeatsRemaining(eventId, heat) {
+            const currentIdx = getCurrentHeatIndex();
+            const targetIdx = heatSchedule.findIndex(h => h.eventId === eventId && h.heat === heat);
+
+            if (targetIdx === -1) return 0;
+            return Math.max(0, targetIdx - currentIdx);
+        }
+
+        function processData() {
+            allSwimmers.clear();
+            allClubs.clear();
+            ageGroupCounts = {};
+
+            if (!allData || !allData.all_results) return;
+
+            for (const [eventId, results] of Object.entries(allData.all_results)) {
+                ageGroupCounts[eventId] = {};
+
+                for (const result of results) {
+                    const name = result.name.toUpperCase();
+
+                    if (result.age_group && result.place && !result.time.includes('DQ') && !result.time.includes('DNA')) {
+                        ageGroupCounts[eventId][result.age_group] = (ageGroupCounts[eventId][result.age_group] || 0) + 1;
+                    }
+
+                    if (!allSwimmers.has(name)) {
+                        allSwimmers.set(name, {
+                            displayName: result.name,
+                            club: result.club,
+                            age: result.age,
+                            results: [],
+                            startLists: []
+                        });
+                    }
+                    const swimmer = allSwimmers.get(name);
+                    swimmer.results.push(result);
+                    if (result.club) {
+                        swimmer.club = result.club;
+                        allClubs.add(result.club);
+                    }
+                    if (result.age) swimmer.age = result.age;
+                }
+            }
+
+            if (allData.start_lists) {
+                for (const [eventId, entries] of Object.entries(allData.start_lists)) {
+                    for (const entry of entries) {
+                        const name = entry.name.toUpperCase();
+                        if (!allSwimmers.has(name)) {
+                            allSwimmers.set(name, {
+                                displayName: entry.name,
+                                club: entry.club,
+                                age: entry.age,
+                                results: [],
+                                startLists: []
+                            });
+                        }
+                        const swimmer = allSwimmers.get(name);
+                        swimmer.startLists.push(entry);
+                        if (entry.club) {
+                            swimmer.club = entry.club;
+                            allClubs.add(entry.club);
+                        }
+                        if (entry.age) swimmer.age = entry.age;
+                    }
+                }
+            }
+        }
+
+        function populateClubFilter() {
+            const select = document.getElementById('clubFilter');
+            const sortedClubs = [...allClubs].sort();
+
+            select.innerHTML = '<option value="">All Clubs</option>';
+            for (const club of sortedClubs) {
+                const option = document.createElement('option');
+                option.value = club;
+                option.textContent = club;
+                select.appendChild(option);
+            }
+        }
+
+        function updateStatus(text) {
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function searchSwimmer() {
+            const query = document.getElementById('swimmerSearch').value.trim().toUpperCase();
+            const clubFilter = document.getElementById('clubFilter').value;
+
+            document.getElementById('suggestions').classList.remove('active');
+            updateActiveFilters(query, clubFilter);
+
+            const matches = [];
+            for (const [name, data] of allSwimmers) {
+                const matchesName = !query || name.includes(query);
+                const matchesClub = !clubFilter || data.club === clubFilter;
+
+                if (matchesName && matchesClub) {
+                    matches.push({ name, data });
+                }
+            }
+
+            matches.sort((a, b) => b.data.results.length - a.data.results.length);
+            displayResults(matches, clubFilter);
+        }
+
+        function updateActiveFilters(query, club) {
+            const container = document.getElementById('activeFilters');
+            let html = '';
+
+            if (query) {
+                html += `<span class="filter-tag">Name: ${query} <span class="remove" onclick="clearNameFilter()">✕</span></span>`;
+            }
+            if (club) {
+                html += `<span class="filter-tag">Club: ${club} <span class="remove" onclick="clearClubFilter()">✕</span></span>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function clearNameFilter() {
+            document.getElementById('swimmerSearch').value = '';
+            searchSwimmer();
+        }
+
+        function clearClubFilter() {
+            document.getElementById('clubFilter').value = '';
+            searchSwimmer();
+        }
+
+        function filterByClub(club) {
+            document.getElementById('clubFilter').value = club;
+            document.getElementById('swimmerSearch').value = '';
+            searchSwimmer();
+        }
+
+        function displayResults(matches, clubFilter) {
+            const container = document.getElementById('results');
+
+            if (matches.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">🔍</div>
+                        <p>No swimmers found matching your search</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+
+            if (clubFilter && matches.length > 1) {
+                html += renderClubSummary(clubFilter, matches);
+            }
+
+            const displayMatches = clubFilter ? matches.slice(0, 10) : matches;
+            for (const { name, data } of displayMatches) {
+                html += renderSwimmerCard(name, data);
+            }
+
+            if (clubFilter && matches.length > 10) {
+                html += `<p style="text-align: center; color: #888;">Showing 10 of ${matches.length} swimmers. Search by name to see specific swimmers.</p>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderClubSummary(club, swimmers) {
+            const totalRaces = swimmers.reduce((sum, s) => sum + s.data.results.filter(r => r.time && !r.time.includes('DNA')).length, 0);
+            const totalGolds = swimmers.reduce((sum, s) => sum + s.data.results.filter(r => r.place === '1').length, 0);
+            const totalMedals = swimmers.reduce((sum, s) => sum + s.data.results.filter(r => ['1', '2', '3'].includes(r.place)).length, 0);
+
+            return `
+                <div class="club-summary">
+                    <h3>🏊 ${club} - ${swimmers.length} Swimmers</h3>
+                    <div class="swimmer-stats" style="margin-bottom: 15px;">
+                        <div class="stat-box">
+                            <div class="stat-value">${totalRaces}</div>
+                            <div class="stat-label">Total Races</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${totalGolds}</div>
+                            <div class="stat-label">1st Places</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${totalMedals}</div>
+                            <div class="stat-label">Medals</div>
+                        </div>
+                    </div>
+                    <div class="club-swimmers-grid">
+                        ${swimmers.map(s => `
+                            <div class="club-swimmer-item" onclick="selectSwimmer('${s.data.displayName}')">
+                                <div class="club-swimmer-name">${s.data.displayName}</div>
+                                <div class="club-swimmer-stats">
+                                    ${s.data.results.length} races •
+                                    ${s.data.results.filter(r => r.place === '1').length} wins
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectSwimmer(name) {
+            document.getElementById('swimmerSearch').value = name;
+            searchSwimmer();
+        }
+
+        function renderTimeline(upcomingRaces) {
+            if (upcomingRaces.length === 0) return '';
+
+            const currentIdx = getCurrentHeatIndex();
+            const totalHeats = heatSchedule.length;
+            const progressPercent = totalHeats > 0 ? (currentIdx / totalHeats) * 100 : 0;
+
+            // Find the swimmer's next race
+            const nextRace = upcomingRaces[0];
+            const nextRaceETA = getHeatETA(nextRace.event_id, nextRace.heat);
+            const heatsUntilNext = getHeatsRemaining(nextRace.event_id, nextRace.heat);
+
+            // Get current event info
+            const currentHeat = heatSchedule[currentIdx];
+            const currentEventName = currentHeat ? currentHeat.eventName.replace(/^\d+\s*/, '') : 'Unknown';
+
+            return `
+                <div class="timeline-section">
+                    <div class="timeline-header">
+                        <div class="timeline-title">
+                            ⏱️ Race Timeline
+                        </div>
+                        <div class="current-event-badge">
+                            Now: ${currentEventName} Heat ${currentHeat?.heat || '?'}
+                        </div>
+                    </div>
+
+                    <div class="timeline-container">
+                        <div class="timeline-track">
+                            <div class="timeline-progress" style="width: ${progressPercent}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="eta-display">
+                        <div class="eta-label">Next Race In</div>
+                        <div class="eta-time">${formatETA(nextRaceETA)}</div>
+                        <div class="eta-detail">
+                            ${heatsUntilNext} heat${heatsUntilNext !== 1 ? 's' : ''} remaining •
+                            Event ${nextRace.event_id} Heat ${nextRace.heat}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSwimmerCard(name, data) {
+            const results = data.results || [];
+            const startLists = data.startLists || [];
+
+            const completedRaces = results.filter(r => r.time && !r.time.includes('DQ') && !r.time.includes('DNA')).length;
+            const goldCount = results.filter(r => r.place === '1').length;
+            const silverCount = results.filter(r => r.place === '2').length;
+            const bronzeCount = results.filter(r => r.place === '3').length;
+
+            const placements = results
+                .filter(r => r.place && !isNaN(parseInt(r.place)))
+                .map(r => parseInt(r.place));
+            const bestPlace = placements.length > 0 ? Math.min(...placements) : '-';
+
+            const completedEvents = new Set(results.map(r => r.event_id));
+            const upcomingRaces = startLists
+                .filter(s => !completedEvents.has(s.event_id))
+                .sort((a, b) => {
+                    const aIdx = heatSchedule.findIndex(h => h.eventId === a.event_id && h.heat === a.heat);
+                    const bIdx = heatSchedule.findIndex(h => h.eventId === b.event_id && h.heat === b.heat);
+                    return aIdx - bIdx;
+                });
+
+            let html = `
+                <div class="swimmer-card">
+                    <div class="swimmer-header">
+                        <div>
+                            <h2 class="swimmer-name">${data.displayName}</h2>
+                            <p class="swimmer-club">
+                                ${data.club ? `<span class="club-badge" onclick="filterByClub('${data.club}')">${data.club}</span>` : 'Unknown Club'}
+                                ${data.age ? ` • Age ${data.age}` : ''}
+                            </p>
+                        </div>
+                        <div class="swimmer-stats">
+                            <div class="stat-box">
+                                <div class="stat-value">${completedRaces}</div>
+                                <div class="stat-label">Races</div>
+                            </div>
+                            <div class="stat-box" style="background: rgba(255, 215, 0, 0.15);">
+                                <div class="stat-value" style="color: #ffd700;">${goldCount}</div>
+                                <div class="stat-label">1st</div>
+                            </div>
+                            <div class="stat-box" style="background: rgba(192, 192, 192, 0.15);">
+                                <div class="stat-value" style="color: #c0c0c0;">${silverCount}</div>
+                                <div class="stat-label">2nd</div>
+                            </div>
+                            <div class="stat-box" style="background: rgba(205, 127, 50, 0.15);">
+                                <div class="stat-value" style="color: #cd7f32;">${bronzeCount}</div>
+                                <div class="stat-label">3rd</div>
+                            </div>
+                        </div>
+                    </div>
+            `;
+
+            // Timeline visualization for upcoming races
+            if (upcomingRaces.length > 0) {
+                html += renderTimeline(upcomingRaces);
+
+                html += `<div class="section-title">Upcoming Races</div><div style="margin-bottom: 25px;">`;
+
+                for (const race of upcomingRaces) {
+                    const eta = getHeatETA(race.event_id, race.heat);
+                    const heatsRemaining = getHeatsRemaining(race.event_id, race.heat);
+
+                    html += `
+                        <div class="upcoming-race">
+                            <div class="upcoming-race-header">
+                                <div class="event-info">
+                                    <div class="event-name">${race.event_name}</div>
+                                    <div class="heat-info">
+                                        Heat ${race.heat || '?'}
+                                        ${race.seed_time ? `<span class="seed-time">Seed: ${race.seed_time}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <div class="lane-badge">Lane ${race.lane || '?'}</div>
+                                    <div class="eta-badge">~${formatETA(eta)}</div>
+                                </div>
+                            </div>
+                            <div class="heats-remaining">
+                                ${heatsRemaining} heat${heatsRemaining !== 1 ? 's' : ''} until this race
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            if (results.length > 0) {
+                html += `
+                    <div class="section-title">Race Results</div>
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Place (in Age Group)</th>
+                                <th>Event</th>
+                                <th>Age Group</th>
+                                <th>Time</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                const sortedResults = [...results].sort((a, b) => {
+                    const aNum = parseInt(a.event_id) || 999;
+                    const bNum = parseInt(b.event_id) || 999;
+                    return aNum - bNum;
+                });
+
+                for (const result of sortedResults) {
+                    const placeClass = getPlaceClass(result.place);
+                    const isDQ = result.time && result.time.includes('DQ');
+                    const isDNA = result.time && result.time.includes('DNA');
+                    const totalInAgeGroup = ageGroupCounts[result.event_id]?.[result.age_group] || '?';
+
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="place-cell">
+                                    ${isDQ ? '<span class="dq-badge">DQ</span>' :
+                                      isDNA ? '<span class="dq-badge" style="background:#888">DNA</span>' :
+                                      result.place ? `<span class="place ${placeClass}">${result.place}</span>` : '-'}
+                                    ${result.place && !isDQ && !isDNA ? `<span class="place-context">of ${totalInAgeGroup}</span>` : ''}
+                                </div>
+                            </td>
+                            <td class="event-name">${formatEventName(result.event_name)}</td>
+                            <td><span class="age-group-tag">${result.age_group || '-'}</span></td>
+                            <td class="time">${isDQ || isDNA ? '-' : result.time || '-'}</td>
+                            <td class="points">${result.wa_points || '-'}</td>
+                        </tr>
+                    `;
+                }
+
+                html += '</tbody></table>';
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function getPlaceClass(place) {
+            if (!place) return 'place-other';
+            const num = parseInt(place);
+            if (num === 1) return 'place-1';
+            if (num === 2) return 'place-2';
+            if (num === 3) return 'place-3';
+            return 'place-other';
+        }
+
+        function formatEventName(name) {
+            if (!name) return 'Unknown Event';
+            return name.replace(/^\d+\s*/, '');
+        }
+
+        function showSuggestions(query) {
+            if (!query || query.length < 2) {
+                document.getElementById('suggestions').classList.remove('active');
+                return;
+            }
+
+            const queryUpper = query.toUpperCase();
+            const clubFilter = document.getElementById('clubFilter').value;
+            const matches = [];
+
+            for (const [name, data] of allSwimmers) {
+                if (name.includes(queryUpper)) {
+                    if (!clubFilter || data.club === clubFilter) {
+                        matches.push({ name, displayName: data.displayName, club: data.club });
+                    }
+                }
+                if (matches.length >= 10) break;
+            }
+
+            const container = document.getElementById('suggestions');
+            if (matches.length === 0) {
+                container.classList.remove('active');
+                return;
+            }
+
+            container.innerHTML = matches.map(m => `
+                <div class="suggestion-item" onclick="selectSuggestion('${m.displayName}')">
+                    ${m.displayName} <span style="color: #666">- ${m.club || 'Unknown'}</span>
+                </div>
+            `).join('');
+            container.classList.add('active');
+        }
+
+        function selectSuggestion(name) {
+            document.getElementById('swimmerSearch').value = name;
+            document.getElementById('suggestions').classList.remove('active');
+            searchSwimmer();
+        }
+
+        async function refreshData() {
+            await loadData();
+            const query = document.getElementById('swimmerSearch').value.trim();
+            const clubFilter = document.getElementById('clubFilter').value;
+            if (query || clubFilter) {
+                searchSwimmer();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('swimmerSearch').addEventListener('input', (e) => {
+            showSuggestions(e.target.value);
+        });
+
+        document.getElementById('swimmerSearch').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchSwimmer();
+            }
+        });
+
+        document.getElementById('clubFilter').addEventListener('change', () => {
+            searchSwimmer();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-box')) {
+                document.getElementById('suggestions').classList.remove('active');
+            }
+        });
+
+        // Initial load
+        loadData();
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>

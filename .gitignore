@@ -1,0 +1,7 @@
+swim_results.json
+venv
+node_modules
+.nuxt
+.output
+emulator-data
+dist
