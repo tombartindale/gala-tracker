@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "Bash(node swim_tracker.js --summary)"
+      "Bash(node swim_tracker.js --summary)",
+      "mcp__chrome-devtools__evaluate_script"
     ]
   }
 }

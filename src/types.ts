@@ -12,9 +12,11 @@ export interface StartListEntry {
 export interface SwimmerData {
   displayName: string; club: string; age: string
   results: SwimResult[]; startLists: StartListEntry[]
+  isRelay: boolean
 }
 
 export interface HeatScheduleItem {
   eventId: string; heat: string; eventName: string
   isComplete: boolean; estimatedTime: number; heatDuration: number
+  estimatedStart: Date | null
 }

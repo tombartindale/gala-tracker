@@ -45,7 +45,7 @@ async function runPoll() {
     tracked_swimmers: updated.tracked_swimmers,
     events: updated.events,
     sessions: updated.sessions,
-    title: meta.data()?.title || current_gala_id,
+    title: updated.title || meta.data()?.title || current_gala_id,
   })
   for (const [id, v] of Object.entries(updated.all_results)) {
     batch.set(db.collection(`galas/${current_gala_id}/results`).doc(id), { data: v })

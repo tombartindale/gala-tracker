@@ -60,8 +60,9 @@ async function parseNavigation(baseUrl) {
     const events = {};
     const sessions = [];
     if (!html)
-        return { resultEvents: [], startEvents: [], events, sessions };
+        return { resultEvents: [], startEvents: [], events, sessions, title: '' };
     const $ = cheerio.load(html);
+    const title = $('h2').first().text().trim() || $('title').first().text().trim();
     const resultEvents = [];
     const startEvents = [];
     let currentSession = null;
@@ -112,7 +113,7 @@ async function parseNavigation(baseUrl) {
     });
     if (currentSession)
         sessions.push(Object.assign({}, currentSession, { events: currentSessionEvents }));
-    return { resultEvents, startEvents, events, sessions };
+    return { resultEvents, startEvents, events, sessions, title };
 }
 async function parseResultsPage(baseUrl, eventId, eventName, url) {
     const html = await fetchPage(baseUrl + url);
@@ -181,7 +182,7 @@ async function parseStartListPage(baseUrl, eventId, eventName, url) {
     return entries;
 }
 async function pollAll(currentData, baseUrl) {
-    const { resultEvents, startEvents, events, sessions } = await parseNavigation(baseUrl);
+    const { resultEvents, startEvents, events, sessions, title } = await parseNavigation(baseUrl);
     const allResults = { ...(currentData.all_results || {}) };
     const startLists = { ...(currentData.start_lists || {}) };
     const trackedResults = { ...(currentData.tracked_results || {}) };
@@ -210,7 +211,7 @@ async function pollAll(currentData, baseUrl) {
     return {
         last_updated: new Date().toISOString(),
         tracked_swimmers: trackedNames,
-        events, sessions,
+        events, sessions, title,
         all_results: allResults,
         start_lists: startLists,
         tracked_results: trackedResults,

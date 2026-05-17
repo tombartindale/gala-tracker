@@ -23,6 +23,7 @@ export interface SwimData {
   last_updated: string; tracked_swimmers: string[]; events: Record<string, string>
   sessions: Session[]; all_results: Record<string, SwimResult[]>
   start_lists: Record<string, StartListEntry[]>; tracked_results: Record<string, SwimResult[]>
+  title: string
 }
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
@@ -45,9 +46,10 @@ async function parseNavigation(baseUrl: string) {
   const html = await fetchPage(baseUrl + 'before.htm')
   const events: Record<string, string> = {}
   const sessions: Session[] = []
-  if (!html) return { resultEvents: [] as [string,string,string][], startEvents: [] as [string,string,string][], events, sessions }
+  if (!html) return { resultEvents: [] as [string,string,string][], startEvents: [] as [string,string,string][], events, sessions, title: '' }
 
   const $ = cheerio.load(html)
+  const title = $('h2').first().text().trim() || $('title').first().text().trim()
   const resultEvents: [string, string, string][] = []
   const startEvents: [string, string, string][] = []
   let currentSession: Omit<Session, 'events'> | null = null
@@ -86,7 +88,7 @@ async function parseNavigation(baseUrl: string) {
     }
   })
   if (currentSession) sessions.push(Object.assign({}, currentSession, { events: currentSessionEvents }))
-  return { resultEvents, startEvents, events, sessions }
+  return { resultEvents, startEvents, events, sessions, title }
 }
 
 async function parseResultsPage(baseUrl: string, eventId: string, eventName: string, url: string): Promise<SwimResult[]> {
@@ -143,7 +145,7 @@ async function parseStartListPage(baseUrl: string, eventId: string, eventName: s
 }
 
 export async function pollAll(currentData: Partial<SwimData>, baseUrl: string): Promise<SwimData> {
-  const { resultEvents, startEvents, events, sessions } = await parseNavigation(baseUrl)
+  const { resultEvents, startEvents, events, sessions, title } = await parseNavigation(baseUrl)
   const allResults: Record<string, SwimResult[]> = { ...(currentData.all_results || {}) }
   const startLists: Record<string, StartListEntry[]> = { ...(currentData.start_lists || {}) }
   const trackedResults: Record<string, SwimResult[]> = { ...(currentData.tracked_results || {}) }
@@ -171,7 +173,7 @@ export async function pollAll(currentData: Partial<SwimData>, baseUrl: string): 
   return {
     last_updated: new Date().toISOString(),
     tracked_swimmers: trackedNames,
-    events, sessions,
+    events, sessions, title,
     all_results: allResults,
     start_lists: startLists,
     tracked_results: trackedResults,
