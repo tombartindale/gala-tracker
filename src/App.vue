@@ -38,7 +38,7 @@
               </div>
             </div>
           </div>
-          <select v-model="clubFilter" @change="doSearch">
+          <select v-model="clubFilter" @change="onClubChange">
             <option value="">All Clubs</option>
             <option v-for="club in sortedClubs" :key="club" :value="club">{{ club }}</option>
           </select>
@@ -103,8 +103,14 @@
             <div v-for="s in searchMatches" :key="s.name" class="club-swimmer-item"
               @click="selectSwimmer(s.data.displayName)">
               <div class="club-swimmer-name">{{ s.data.displayName }}</div>
-              <div class="club-swimmer-stats">{{ s.data.results.length }} races • {{s.data.results.filter(r => r.place
-                === '1').length }} wins</div>
+              <div class="club-swimmer-stats">
+                <span class="swimmer-race-count">{{ s.data.results.length }} races</span>
+                <span class="swimmer-medals">
+                  <span v-if="s.data.results.filter(r => r.place === '1').length" class="medal-count medal-gold">🥇{{ s.data.results.filter(r => r.place === '1').length }}</span>
+                  <span v-if="s.data.results.filter(r => r.place === '2').length" class="medal-count medal-silver">🥈{{ s.data.results.filter(r => r.place === '2').length }}</span>
+                  <span v-if="s.data.results.filter(r => r.place === '3').length" class="medal-count medal-bronze">🥉{{ s.data.results.filter(r => r.place === '3').length }}</span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -485,7 +491,6 @@ const activeNameFilter = computed(() =>
 )
 const activeClubFilter = computed(() => {
   if (route.name === 'club' || route.name === 'gala-club') return decodeURIComponent(route.params.club as string)
-  if ((route.name === 'swimmer' || route.name === 'gala-swimmer') && route.query.club) return route.query.club as string
   return ''
 })
 
@@ -493,7 +498,7 @@ const activeClubFilter = computed(() => {
 watch(route, () => {
   if (route.name === 'swimmer' || route.name === 'gala-swimmer') {
     searchQuery.value = decodeURIComponent(route.params.name as string)
-    clubFilter.value = (route.query.club as string) || ''
+    clubFilter.value = ''
   } else if (route.name === 'club' || route.name === 'gala-club') {
     searchQuery.value = ''
     clubFilter.value = decodeURIComponent(route.params.club as string)
@@ -510,7 +515,13 @@ const searchMatches = computed(() => {
   for (const [name, data] of allSwimmers.value) {
     if ((!q || name.includes(q)) && (!club || data.club === club)) matches.push({ name, data })
   }
-  return matches.sort((a, b) => b.data.results.length - a.data.results.length)
+  return matches.sort((a, b) => {
+    if (activeClubFilter.value) {
+      const surname = (name: string) => name.trim().split(/\s+/).at(-1) ?? name
+      return surname(a.data.displayName).localeCompare(surname(b.data.displayName))
+    }
+    return b.data.results.length - a.data.results.length
+  })
 })
 
 const displayMatches = computed(() =>
@@ -553,13 +564,11 @@ function navigate(name: string, club: string) {
   const c = club.trim()
   const g = route.params.galaId as string | undefined
   if (g) {
-    if (n && c) router.push({ name: 'gala-swimmer', params: { galaId: g, name: n }, query: { club: c } })
-    else if (n) router.push({ name: 'gala-swimmer', params: { galaId: g, name: n } })
+    if (n) router.push({ name: 'gala-swimmer', params: { galaId: g, name: n } })
     else if (c) router.push({ name: 'gala-club', params: { galaId: g, club: c } })
     else router.push({ name: 'gala', params: { galaId: g } })
   } else {
-    if (n && c) router.push({ name: 'swimmer', params: { name: n }, query: { club: c } })
-    else if (n) router.push({ name: 'swimmer', params: { name: n } })
+    if (n) router.push({ name: 'swimmer', params: { name: n } })
     else if (c) router.push({ name: 'club', params: { club: c } })
     else router.push('/')
   }
@@ -567,14 +576,20 @@ function navigate(name: string, club: string) {
 
 function doSearch() { navigate(searchQuery.value, clubFilter.value) }
 
+function onClubChange() {
+  searchQuery.value = ''
+  suggestions.value = []
+  doSearch()
+}
+
 function onSearchInput() {
+  clubFilter.value = ''
   const q = searchQuery.value.trim()
   if (!q || q.length < 2) { suggestions.value = []; return }
   const upper = q.toUpperCase()
-  const club = clubFilter.value
   const matches: typeof suggestions.value = []
   for (const [name, data] of allSwimmers.value) {
-    if (!data.isRelay && name.includes(upper) && (!club || data.club === club)) matches.push({ name, displayName: data.displayName, club: data.club })
+    if (!data.isRelay && name.includes(upper)) matches.push({ name, displayName: data.displayName, club: data.club })
     if (matches.length >= 10) break
   }
   suggestions.value = matches
@@ -595,19 +610,11 @@ function filterByClub(club: string) {
 }
 function clearNameFilter() {
   const g = route.params.galaId as string | undefined
-  if (activeClubFilter.value) {
-    g ? router.push({ name: 'gala-club', params: { galaId: g, club: activeClubFilter.value } }) : router.push({ name: 'club', params: { club: activeClubFilter.value } })
-  } else {
-    g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
-  }
+  g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
 }
 function clearClubFilter() {
   const g = route.params.galaId as string | undefined
-  if (activeNameFilter.value) {
-    g ? router.push({ name: 'gala-swimmer', params: { galaId: g, name: activeNameFilter.value } }) : router.push({ name: 'swimmer', params: { name: activeNameFilter.value } })
-  } else {
-    g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
-  }
+  g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
 }
 function formatHeatTime(d: Date) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }
 </script>
@@ -880,7 +887,29 @@ select option {
 .club-swimmer-stats {
   font-size: 0.8rem;
   color: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
 }
+
+.swimmer-medals {
+  display: flex;
+  gap: 4px;
+}
+
+.medal-count {
+  font-size: 0.75rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.medal-gold { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
+.medal-silver { background: rgba(192, 192, 192, 0.15); color: #c0c0c0; }
+.medal-bronze { background: rgba(205, 127, 50, 0.15); color: #cd7f32; }
 
 .swimmer-stats {
   display: flex;
