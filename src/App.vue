@@ -159,7 +159,7 @@ const now = ref(new Date())
 const _tick = setInterval(() => { now.value = new Date() }, 30_000)
 onUnmounted(() => clearInterval(_tick))
 
-function isRelayCode(name: string) { return /^[A-Z0-9]+_[A-Z0-9]+_[MF]$/.test(name) }
+function isRelayCode(name: string) { return /^[A-Z0-9]+_[A-Z0-9]+_[MFX]$/.test(name) }
 function parseRelayCode(name: string) {
   const parts = name.split('_')
   const gender = parts.at(-1) === 'F' ? 'Female' : 'Male'

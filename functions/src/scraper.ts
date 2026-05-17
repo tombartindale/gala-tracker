@@ -108,7 +108,7 @@ async function parseResultsPage(baseUrl: string, eventId: string, eventName: str
         if (cells.length < 6) return
         const place = $(cells[0]).text().trim().replace(/\.$/, '')
         const name = $(cells[1]).text().trim()
-        if (!name || name === 'Name') return
+        if (!name || name === 'Name' || /^\d+m$/i.test(name)) return
         const age = cells.length > 2 ? $(cells[2]).text().trim() : ''
         const club = cells.length > 3 ? $(cells[3]).text().trim() : ''
         const time = cells.length > 5 ? $(cells[5]).text().trim() : ''
