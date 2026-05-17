@@ -101,7 +101,7 @@
           </div>
           <div class="club-swimmers-grid">
             <div v-for="s in searchMatches" :key="s.name" class="club-swimmer-item"
-              @click="selectSwimmer(s.data.displayName)">
+              @click="selectSwimmer(s.name)">
               <div class="club-swimmer-name">{{ s.data.displayName }}</div>
               <div class="club-swimmer-stats">
                 <span class="swimmer-race-count">{{ s.data.results.length }} races</span>
