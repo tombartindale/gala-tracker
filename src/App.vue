@@ -3,7 +3,19 @@
     <header>
       <p class="app-label">Swim Results Tracker</p>
       <h1>{{ gala?.title || 'Loading...' }}</h1>
+      <nav v-if="allGalas.length > 1" class="gala-nav">
+        <router-link
+          v-for="g in allGalas"
+          :key="g.gala_id"
+          :to="g.isToday ? '/' : { name: 'gala', params: { galaId: g.gala_id } }"
+          :class="['gala-nav-item', { active: galaId === g.gala_id }]"
+        >{{ g.label }}</router-link>
+      </nav>
     </header>
+
+    <div v-if="isHistorical" class="historical-banner">
+      Viewing past results &mdash; <router-link to="/">Back to today</router-link>
+    </div>
 
     <div v-if="showBanner" class="info-banner">
       <div class="info-banner-content">
@@ -124,6 +136,10 @@
         Showing 10 of {{ searchMatches.length }} swimmers. Search by name to see specific swimmers.
       </p>
     </template>
+
+    <footer class="app-footer">
+      Open source &mdash; <a href="https://github.com/tombartindale/gala-tracker" target="_blank" rel="noopener">github.com/tombartindale/gala-tracker</a>
+    </footer>
   </div>
 </template>
 
@@ -157,8 +173,43 @@ const EVENT_BUFFER = 2
 
 // ── Firestore bindings ────────────────────────────────────────────────────────
 
-const config = useDocument<{ current_gala_id: string }>(doc(db, 'config', 'scraper'))
-const galaId = computed(() => config.value?.current_gala_id)
+interface GalaConfig { gala_id: string; race_dates: string[] }
+const config = useDocument<{ galas: GalaConfig[] }>(doc(db, 'config', 'scraper'))
+
+function todayUK() { return new Date().toLocaleDateString('en-GB') }
+
+function formatGalaDates(dates: string[]): string {
+  if (!dates.length) return ''
+  const parse = (d: string) => { const [day, mon, yr] = d.split('/'); return new Date(+yr, +mon - 1, +day) }
+  const sorted = [...dates].sort()
+  const first = parse(sorted[0]), last = parse(sorted[sorted.length - 1])
+  const mon = first.toLocaleDateString('en-GB', { month: 'short' })
+  const yr = first.getFullYear()
+  return sorted.length === 1
+    ? `${first.getDate()} ${mon} ${yr}`
+    : `${first.getDate()}–${last.getDate()} ${mon} ${yr}`
+}
+
+const todayGalaId = computed(() => {
+  const today = todayUK()
+  return config.value?.galas?.find(g => g.race_dates.includes(today))?.gala_id ?? null
+})
+
+const galaId = computed(() =>
+  (route.params.galaId as string | undefined) ?? todayGalaId.value ?? undefined
+)
+
+const isHistorical = computed(() =>
+  !!route.params.galaId && route.params.galaId !== todayGalaId.value
+)
+
+const allGalas = computed(() =>
+  (config.value?.galas ?? []).map(g => ({
+    gala_id: g.gala_id,
+    isToday: g.race_dates.includes(todayUK()),
+    label: formatGalaDates(g.race_dates),
+  }))
+)
 
 const gala = useDocument(computed(() =>
   galaId.value ? doc(db, 'galas', galaId.value) : null
@@ -201,23 +252,28 @@ const ageGroupCounts = computed(() => {
 })
 
 const allSwimmers = computed<Map<string, SwimmerData>>(() => {
-  // First pass: collect canonical club names from individual (non-relay) entries
-  const canonicalClubs: string[] = []
+  // Collect every club name that appears anywhere in the data
+  const allClubNames = new Set<string>()
   for (const results of Object.values(allResults.value))
-    for (const r of results) if (r.club && !isRelayCode(r.name)) canonicalClubs.push(r.club)
+    for (const r of results) if (r.club) allClubNames.add(r.club)
   for (const entries of Object.values(allStartLists.value))
-    for (const e of entries) if (e.club && !isRelayCode(e.name)) canonicalClubs.push(e.club)
-  const canonicalSet = new Set(canonicalClubs)
+    for (const e of entries) if (e.club) allClubNames.add(e.club)
 
-  // Resolve an abbreviated relay club name to the canonical full name
-  function resolveClub(club: string): string {
-    if (!club || canonicalSet.has(club)) return club
+  // Build a normalization map: short/abbreviated name → longest matching name.
+  // "Darlington" → "Darlington SC", "Northall'ton" → "Northallerton SC", etc.
+  const clubNorm = new Map<string, string>()
+  for (const club of allClubNames) {
     const lc = club.toLowerCase()
-    // Strip trailing apostrophe-abbreviation (e.g. "Northall'ton" → "Northall")
     const prefix = lc.includes("'") ? lc.split("'")[0] : lc
-    for (const c of canonicalSet) if (c.toLowerCase().startsWith(prefix)) return c
-    return club
+    let best = club
+    for (const other of allClubNames) {
+      if (other !== club && other.toLowerCase().startsWith(prefix) && other.length > best.length)
+        best = other
+    }
+    clubNorm.set(club, best)
   }
+
+  const normalizeClub = (club: string) => clubNorm.get(club) ?? club
 
   const swimmers = new Map<string, SwimmerData>()
 
@@ -225,7 +281,7 @@ const allSwimmers = computed<Map<string, SwimmerData>>(() => {
     for (const r of results) {
       const key = r.name.toUpperCase()
       const relay = isRelayCode(r.name)
-      const club = relay ? resolveClub(r.club) : r.club
+      const club = normalizeClub(r.club)
       if (!swimmers.has(key)) swimmers.set(key, { displayName: relay ? parseRelayCode(r.name) : r.name, club, age: r.age, results: [], startLists: [], isRelay: relay })
       const s = swimmers.get(key)!
       s.results.push(r)
@@ -238,7 +294,7 @@ const allSwimmers = computed<Map<string, SwimmerData>>(() => {
     for (const e of entries) {
       const key = e.name.toUpperCase()
       const relay = isRelayCode(e.name)
-      const club = relay ? resolveClub(e.club) : e.club
+      const club = normalizeClub(e.club)
       if (!swimmers.has(key)) swimmers.set(key, { displayName: relay ? parseRelayCode(e.name) : e.name, club, age: e.age, results: [], startLists: [], isRelay: relay })
       const s = swimmers.get(key)!
       s.startLists.push(e)
@@ -381,20 +437,20 @@ const clubFilter = ref('')
 const suggestions = ref<{ name: string; displayName: string; club: string }[]>([])
 
 const activeNameFilter = computed(() =>
-  route.name === 'swimmer' ? (route.params.name as string).toUpperCase() : ''
+  (route.name === 'swimmer' || route.name === 'gala-swimmer') ? (route.params.name as string).toUpperCase() : ''
 )
 const activeClubFilter = computed(() => {
-  if (route.name === 'club') return decodeURIComponent(route.params.club as string)
-  if (route.name === 'swimmer' && route.query.club) return route.query.club as string
+  if (route.name === 'club' || route.name === 'gala-club') return decodeURIComponent(route.params.club as string)
+  if ((route.name === 'swimmer' || route.name === 'gala-swimmer') && route.query.club) return route.query.club as string
   return ''
 })
 
 // Keep search box inputs in sync with the URL on navigation / page load
 watch(route, () => {
-  if (route.name === 'swimmer') {
+  if (route.name === 'swimmer' || route.name === 'gala-swimmer') {
     searchQuery.value = decodeURIComponent(route.params.name as string)
     clubFilter.value = (route.query.club as string) || ''
-  } else if (route.name === 'club') {
+  } else if (route.name === 'club' || route.name === 'gala-club') {
     searchQuery.value = ''
     clubFilter.value = decodeURIComponent(route.params.club as string)
   } else {
@@ -451,10 +507,18 @@ function navigate(name: string, club: string) {
   suggestions.value = []
   const n = name.trim()
   const c = club.trim()
-  if (n && c) router.push({ name: 'swimmer', params: { name: n }, query: { club: c } })
-  else if (n) router.push({ name: 'swimmer', params: { name: n } })
-  else if (c) router.push({ name: 'club', params: { club: c } })
-  else router.push('/')
+  const g = route.params.galaId as string | undefined
+  if (g) {
+    if (n && c) router.push({ name: 'gala-swimmer', params: { galaId: g, name: n }, query: { club: c } })
+    else if (n) router.push({ name: 'gala-swimmer', params: { galaId: g, name: n } })
+    else if (c) router.push({ name: 'gala-club', params: { galaId: g, club: c } })
+    else router.push({ name: 'gala', params: { galaId: g } })
+  } else {
+    if (n && c) router.push({ name: 'swimmer', params: { name: n }, query: { club: c } })
+    else if (n) router.push({ name: 'swimmer', params: { name: n } })
+    else if (c) router.push({ name: 'club', params: { club: c } })
+    else router.push('/')
+  }
 }
 
 function doSearch() { navigate(searchQuery.value, clubFilter.value) }
@@ -477,13 +541,29 @@ function selectSuggestion(name: string) {
   navigate(name, clubFilter.value)
 }
 
-function selectSwimmer(name: string) { router.push({ name: 'swimmer', params: { name } }) }
-function filterByClub(club: string) { router.push({ name: 'club', params: { club } }) }
+function selectSwimmer(name: string) {
+  const g = route.params.galaId as string | undefined
+  g ? router.push({ name: 'gala-swimmer', params: { galaId: g, name } }) : router.push({ name: 'swimmer', params: { name } })
+}
+function filterByClub(club: string) {
+  const g = route.params.galaId as string | undefined
+  g ? router.push({ name: 'gala-club', params: { galaId: g, club } }) : router.push({ name: 'club', params: { club } })
+}
 function clearNameFilter() {
-  activeClubFilter.value ? router.push({ name: 'club', params: { club: activeClubFilter.value } }) : router.push('/')
+  const g = route.params.galaId as string | undefined
+  if (activeClubFilter.value) {
+    g ? router.push({ name: 'gala-club', params: { galaId: g, club: activeClubFilter.value } }) : router.push({ name: 'club', params: { club: activeClubFilter.value } })
+  } else {
+    g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
+  }
 }
 function clearClubFilter() {
-  activeNameFilter.value ? router.push({ name: 'swimmer', params: { name: activeNameFilter.value } }) : router.push('/')
+  const g = route.params.galaId as string | undefined
+  if (activeNameFilter.value) {
+    g ? router.push({ name: 'gala-swimmer', params: { galaId: g, name: activeNameFilter.value } }) : router.push({ name: 'swimmer', params: { name: activeNameFilter.value } })
+  } else {
+    g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
+  }
 }
 function formatHeatTime(d: Date) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }
 </script>
@@ -551,6 +631,13 @@ select option { background: #1a1a2e; }
 .club-upcoming-swimmers { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
 .club-upcoming-swimmer { font-size: 0.82rem; color: #fff; background: rgba(0,217,255,0.1); padding: 2px 8px; border-radius: 12px; display: flex; align-items: center; gap: 5px; }
 .swimmer-lane { font-size: 0.7rem; color: #888; }
+.gala-nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.gala-nav-item { padding: 5px 14px; border-radius: 20px; font-size: 0.82rem; color: #888; border: 1px solid rgba(255,255,255,0.1); text-decoration: none; transition: all 0.2s; }
+.gala-nav-item:hover { color: #ddd; border-color: rgba(255,255,255,0.25); }
+.gala-nav-item.active { color: #00d9ff; border-color: rgba(0,217,255,0.5); background: rgba(0,217,255,0.08); }
+.historical-banner { background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.25); border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; font-size: 0.88rem; color: #b8960a; text-align: center; }
+.historical-banner a { color: #ffc107; text-decoration: none; font-weight: 600; }
+.historical-banner a:hover { text-decoration: underline; }
 .info-banner { background: rgba(0,217,255,0.08); border: 1px solid rgba(0,217,255,0.25); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
 .info-banner-content { display: flex; align-items: center; gap: 12px; }
 .info-banner-text { flex: 1; font-size: 0.9rem; color: #b0e8f0; line-height: 1.5; }
@@ -569,4 +656,7 @@ select option { background: #1a1a2e; }
   .stat-box { padding: 10px 12px; min-width: 60px; }
   .stat-value { font-size: 1.2rem; }
 }
+.app-footer { text-align: center; margin-top: 40px; padding: 20px; font-size: 0.8rem; color: #444; }
+.app-footer a { color: #666; text-decoration: none; }
+.app-footer a:hover { color: #888; }
 </style>

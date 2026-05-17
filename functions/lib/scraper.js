@@ -185,23 +185,10 @@ async function pollAll(currentData, baseUrl) {
     const { resultEvents, startEvents, events, sessions, title } = await parseNavigation(baseUrl);
     const allResults = { ...(currentData.all_results || {}) };
     const startLists = { ...(currentData.start_lists || {}) };
-    const trackedResults = { ...(currentData.tracked_results || {}) };
-    const trackedNames = currentData.tracked_swimmers || [];
     for (const [eventId, eventName, url] of resultEvents) {
         const results = await parseResultsPage(baseUrl, eventId, eventName, url);
-        if (results.length) {
+        if (results.length)
             allResults[eventId] = results;
-            for (const result of results) {
-                const nameUpper = result.name.toUpperCase();
-                if (trackedNames.some(t => t.includes(nameUpper) || nameUpper.includes(t))) {
-                    if (!trackedResults[nameUpper])
-                        trackedResults[nameUpper] = [];
-                    const dup = trackedResults[nameUpper].some(r => r.event_id === result.event_id && r.time === result.time);
-                    if (!dup)
-                        trackedResults[nameUpper].push(result);
-                }
-            }
-        }
     }
     for (const [eventId, eventName, url] of startEvents) {
         const entries = await parseStartListPage(baseUrl, eventId, eventName, url);
@@ -210,11 +197,9 @@ async function pollAll(currentData, baseUrl) {
     }
     return {
         last_updated: new Date().toISOString(),
-        tracked_swimmers: trackedNames,
         events, sessions, title,
         all_results: allResults,
         start_lists: startLists,
-        tracked_results: trackedResults,
     };
 }
 //# sourceMappingURL=scraper.js.map

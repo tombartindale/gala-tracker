@@ -7,5 +7,8 @@ export default createRouter({
     { path: '/', name: 'home', component: App },
     { path: '/swimmer/:name', name: 'swimmer', component: App },
     { path: '/club/:club', name: 'club', component: App },
+    { path: '/gala/:galaId', name: 'gala', component: App },
+    { path: '/gala/:galaId/swimmer/:name', name: 'gala-swimmer', component: App },
+    { path: '/gala/:galaId/club/:club', name: 'gala-club', component: App },
   ],
 })
