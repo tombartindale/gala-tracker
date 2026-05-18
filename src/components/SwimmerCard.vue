@@ -23,10 +23,6 @@
     <div v-if="upcomingRaces.length" class="timeline-section">
       <div class="timeline-header">
         <div class="timeline-title">⏱️ Race Timeline</div>
-        <div class="current-event-badge">
-          Now: {{ currentHeat ? currentHeat.eventName.replace(/^\d+\s*/, '') : '?' }}
-          Heat {{ currentHeat?.heat || '?' }}
-        </div>
       </div>
       <div class="timeline-track">
         <div class="timeline-progress" :style="{ width: progressPercent + '%' }"></div>
@@ -148,7 +144,6 @@ const currentHeatIndex = computed(() => {
   const i = props.heatSchedule.findIndex(h => !h.isComplete)
   return i === -1 ? props.heatSchedule.length : i
 })
-const currentHeat = computed(() => props.heatSchedule[currentHeatIndex.value])
 const progressPercent = computed(() => props.heatSchedule.length ? (currentHeatIndex.value / props.heatSchedule.length) * 100 : 0)
 const nextRaceETA = computed(() => upcomingRaces.value.length ? getHeatETA(upcomingRaces.value[0].event_id, upcomingRaces.value[0].heat) : null)
 const heatsUntilNext = computed(() => upcomingRaces.value.length ? getHeatsRemaining(upcomingRaces.value[0].event_id, upcomingRaces.value[0].heat) : 0)

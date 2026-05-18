@@ -67,10 +67,10 @@
         :class="['heat-strip-item', i === 0 ? 'heat-current' : '']">
         <div class="heat-strip-label">{{ (i === 0 && (!h.estimatedStart || h.estimatedStart <= now)) ? 'NOW' :
           h.estimatedStart ? `~${formatHeatTime(h.estimatedStart)}` : `+${i}` }}</div>
-            <div class="heat-strip-event">{{ h.eventName }}</div>
-            <div class="heat-strip-heat">Heat {{ h.heat }}</div>
-        </div>
+        <div class="heat-strip-event">{{ h.eventName }}</div>
+        <div class="heat-strip-heat">Heat {{ h.heat }}</div>
       </div>
+    </div>
 
       <div v-if="!activeNameFilter && !activeClubFilter" class="no-results">
         <div class="no-results-icon">🏊</div>
@@ -959,6 +959,14 @@ select option {
   border-color: rgba(0, 217, 255, 0.4);
 }
 
+.heat-strip-item.heat-current .heat-strip-label {
+  color: #00d9ff;
+}
+
+.heat-strip-item.heat-current .heat-strip-heat {
+  color: #aaa;
+}
+
 .heat-strip-label {
   font-size: 0.65rem;
   font-weight: 700;
@@ -966,10 +974,6 @@ select option {
   letter-spacing: 0.08em;
   color: #888;
   margin-bottom: 4px;
-}
-
-.heat-strip-item.heat-current .heat-strip-label {
-  color: #00d9ff;
 }
 
 .heat-strip-event {
@@ -983,10 +987,6 @@ select option {
 .heat-strip-heat {
   font-size: 0.75rem;
   color: #666;
-}
-
-.heat-strip-item.heat-current .heat-strip-heat {
-  color: #aaa;
 }
 
 .club-upcoming {
