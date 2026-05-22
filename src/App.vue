@@ -66,7 +66,7 @@
       <div v-for="(h, i) in upcomingHeats" :key="`${h.eventId}-${h.heat}`"
         :class="['heat-strip-item', i === 0 ? 'heat-current' : '']">
         <div class="heat-strip-label">{{ (i === 0 && (!h.estimatedStart || h.estimatedStart <= now)) ? 'NOW' :
-          h.estimatedStart ? `~${formatHeatTime(h.estimatedStart)}` : `+${i}` }}</div>
+          h.estimatedStart ? `~${formatHeatTime(h.estimatedStart)}${dayLabel(h.estimatedStart) ? ` (${dayLabel(h.estimatedStart)})` : ''}` : `+${i}` }}</div>
         <div class="heat-strip-event">{{ h.eventName }}</div>
         <div class="heat-strip-heat">Heat {{ h.heat }}</div>
       </div>
@@ -118,7 +118,7 @@
             <h4>Upcoming Races</h4>
             <div v-for="race in clubUpcomingRaces.filter(r => r.heat)" :key="`${race.eventId}-${race.heat}`" class="club-upcoming-row">
               <div class="club-upcoming-time">
-                <span v-if="race.estimatedStart" class="est-time">~{{ formatHeatTime(race.estimatedStart) }}</span>
+                <span v-if="race.estimatedStart" class="est-time">~{{ formatHeatTime(race.estimatedStart) }}<span v-if="dayLabel(race.estimatedStart)" class="day-label"> ({{ dayLabel(race.estimatedStart) }})</span></span>
                 <span v-else class="est-time no-time">—</span>
               </div>
               <div class="club-upcoming-event">{{ race.eventName }} · Heat {{ race.heat }}</div>
@@ -492,9 +492,14 @@ groups.push({ sessionStart, eventIds: ids })
     const sessionInFuture = sessionBasedStart !== null && sessionBasedStart.getTime() > nowMs
     if (!sessionInFuture) {
       const baseOffset = schedule[firstIncomplete].estimatedTime
+      const currentSessionStart = schedule[firstIncomplete].sessionStart
       for (let i = firstIncomplete; i < schedule.length; i++) {
-        const relativeMs = (schedule[i].estimatedTime - baseOffset) * 60_000
-        schedule[i].estimatedStart = new Date(nowMs + relativeMs)
+        const h = schedule[i]
+        // Stop re-anchoring when we reach a different session that starts in the future —
+        // those heats already have a correct absolute session start and must not be shifted.
+        if (h.sessionStart !== currentSessionStart && h.sessionStart !== null && h.sessionStart.getTime() > nowMs) break
+        const relativeMs = (h.estimatedTime - baseOffset) * 60_000
+        h.estimatedStart = new Date(nowMs + relativeMs)
       }
     }
   }
@@ -640,6 +645,14 @@ function clearClubFilter() {
   g ? router.push({ name: 'gala', params: { galaId: g } }) : router.push('/')
 }
 function formatHeatTime(d: Date) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }
+function dayLabel(d: Date): string {
+  const todayStart = new Date(now.value); todayStart.setHours(0, 0, 0, 0)
+  const tomorrowStart = new Date(todayStart.getTime() + 86_400_000)
+  const dayAfterStart = new Date(todayStart.getTime() + 2 * 86_400_000)
+  if (d < tomorrowStart) return ''
+  if (d < dayAfterStart) return 'Tomorrow'
+  return d.toLocaleDateString([], { weekday: 'long' })
+}
 </script>
 
 <style>
@@ -1041,6 +1054,11 @@ select option {
 
 .club-upcoming-time {
   flex: 0 0 60px;
+}
+
+.day-label {
+  font-weight: 400;
+  opacity: 0.7;
 }
 
 .est-time {
