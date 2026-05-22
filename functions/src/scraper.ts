@@ -48,7 +48,7 @@ async function parseNavigation(baseUrl: string) {
   if (!html) return { resultEvents: [] as [string,string,string][], startEvents: [] as [string,string,string][], events, sessions, title: '' }
 
   const $ = cheerio.load(html)
-  const title = $('h2').first().text().trim() || $('title').first().text().trim()
+  const title = $('h2').filter((_, el) => $(el).text().trim() !== '').first().text().trim() || $('title').first().text().trim()
   const resultEvents: [string, string, string][] = []
   const startEvents: [string, string, string][] = []
   let currentSession: Omit<Session, 'events'> | null = null
@@ -87,7 +87,72 @@ const m = text.match(/Session\s+(\d+?)\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\s+at\s+(\d+
     }
   })
   if (currentSession) sessions.push(Object.assign({}, currentSession, { events: currentSessionEvents }))
-  return { resultEvents, startEvents, events, sessions, title }
+
+  // Look for a draft programme PDF link
+  let draftPdfUrl: string | null = null
+  $('a').each((_, el) => {
+    const href = $(el).attr('href') || ''
+    const text = $(el).text().toLowerCase()
+    if (href.toLowerCase().endsWith('.pdf') && text.includes('draft')) draftPdfUrl = href
+  })
+
+  return { resultEvents, startEvents, events, sessions, title, draftPdfUrl }
+}
+
+async function parseDraftProgramme(
+  baseUrl: string,
+  pdfUrl: string,
+  events: Record<string, string>
+): Promise<Record<string, StartListEntry[]>> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const pdfParse = require('pdf-parse')
+  const res = await fetch(baseUrl + pdfUrl, { headers: HEADERS, signal: AbortSignal.timeout(30000) })
+  if (!res.ok) return {}
+  const buf = Buffer.from(await res.arrayBuffer())
+  const { text } = await pdfParse(buf)
+
+  const result: Record<string, StartListEntry[]> = {}
+  const timestamp = new Date().toISOString()
+  let currentEventId = ''
+  let currentEventName = ''
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim()
+
+    const eventHeader = line.match(/^EVENT\s+(\d+)\s+(.+)$/)
+    if (eventHeader) {
+      currentEventId = eventHeader[1]
+      currentEventName = events[currentEventId] || eventHeader[2].trim()
+      result[currentEventId] = []
+      continue
+    }
+
+    if (!currentEventId) continue
+
+    // Entry line: "1. Firstname SURNAME age Club 1:23.45"
+    const timeMatch = line.match(/\s+([\d:]+\.\d+)\s*$/)
+    if (!timeMatch) continue
+    const seedTime = timeMatch[1]
+    const rest = line.slice(0, line.lastIndexOf(timeMatch[0])).trim()
+
+    // rest: "1. Firstname SURNAME age Club"
+    const entryMatch = rest.match(/^\d+\.\s+(.+?)\s+(\d{1,3})\s+(.+)$/)
+    if (!entryMatch) continue
+
+    result[currentEventId].push({
+      event_id: currentEventId,
+      event_name: currentEventName,
+      heat: '',
+      lane: '',
+      name: entryMatch[1].trim(),
+      age: entryMatch[2],
+      club: entryMatch[3].trim(),
+      seed_time: seedTime,
+      timestamp,
+    })
+  }
+
+  return result
 }
 
 async function parseResultsPage(baseUrl: string, eventId: string, eventName: string, url: string): Promise<SwimResult[]> {
@@ -103,12 +168,14 @@ async function parseResultsPage(baseUrl: string, eventId: string, eventName: str
       const text = $(el).text().trim()
       if (text.includes('Age Group')) currentAgeGroup = text.replace(' - Full Results', '').trim()
     } else if (tag === 'table') {
-      $(el).find('tr').each((_, row) => {
-        const cells = $(row).find('td')
+      const tbody = $(el).children('tbody')
+      const directRows = tbody.length ? tbody.children('tr') : $(el).children('tr')
+      directRows.each((_, row) => {
+        const cells = $(row).children('td')
         if (cells.length < 6) return
         const place = $(cells[0]).text().trim().replace(/\.$/, '')
         const name = $(cells[1]).text().trim()
-        if (!name || name === 'Name' || /^\d+m\b/i.test(name)) return
+        if (!name || name === 'Name' || /^\d+m\b/i.test(name) || !/[a-zA-Z]/.test(name)) return
         const age = cells.length > 2 ? $(cells[2]).text().trim() : ''
         const club = cells.length > 3 ? $(cells[3]).text().trim() : ''
         const time = cells.length > 5 ? $(cells[5]).text().trim() : ''
@@ -129,8 +196,10 @@ async function parseStartListPage(baseUrl: string, eventId: string, eventName: s
   const timestamp = new Date().toISOString()
   let currentHeat = '1'
   $('table').each((_, table) => {
-    $(table).find('tr').each((_, row) => {
-      const cells = $(row).find('td')
+    const tbody = $(table).children('tbody')
+    const directRows = tbody.length ? tbody.children('tr') : $(table).children('tr')
+    directRows.each((_, row) => {
+      const cells = $(row).children('td')
       if (cells.length === 1) { const m = $(cells[0]).text().trim().match(/Heat\s*(?:Number\s*-?\s*)?(\d+)/i); if (m) currentHeat = m[1]; return }
       if (cells.length < 6) return
       const lane = $(cells[0]).text().trim()
@@ -144,7 +213,7 @@ async function parseStartListPage(baseUrl: string, eventId: string, eventName: s
 }
 
 export async function pollAll(currentData: Partial<SwimData>, baseUrl: string): Promise<SwimData> {
-  const { resultEvents, startEvents, events, sessions, title } = await parseNavigation(baseUrl)
+  const { resultEvents, startEvents, events, sessions, title, draftPdfUrl } = await parseNavigation(baseUrl)
   const allResults: Record<string, SwimResult[]> = { ...(currentData.all_results || {}) }
   const startLists: Record<string, StartListEntry[]> = { ...(currentData.start_lists || {}) }
 
@@ -155,6 +224,17 @@ export async function pollAll(currentData: Partial<SwimData>, baseUrl: string): 
   for (const [eventId, eventName, url] of startEvents) {
     const entries = await parseStartListPage(baseUrl, eventId, eventName, url)
     if (entries.length) startLists[eventId] = entries
+  }
+
+  // Fill in any events still missing start list data from the draft programme PDF
+  if (draftPdfUrl) {
+    const missingIds = Object.keys(events).filter(id => !startLists[id])
+    if (missingIds.length > 0) {
+      const draft = await parseDraftProgramme(baseUrl, draftPdfUrl, events)
+      for (const eventId of missingIds) {
+        if (draft[eventId]?.length) startLists[eventId] = draft[eventId]
+      }
+    }
   }
 
   return {

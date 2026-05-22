@@ -57,6 +57,20 @@
         </div>
       </div>
 
+      <div v-if="draftRaces.length" class="race-panel">
+        <div class="section-title">Entered — Heats to be Announced</div>
+        <div class="upcoming-race-list">
+          <div v-for="race in draftRaces" :key="'draft-' + race.event_id" class="upcoming-race upcoming-race--draft">
+            <div class="upcoming-race-header">
+              <div class="event-info">
+                <div class="event-name">{{ race.event_name }}</div>
+                <div class="heat-info draft-notice">Waiting for heat info<span v-if="race.seed_time" class="seed-time">Seed: {{ race.seed_time }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="data.results.length || pendingRaces.length" class="race-panel">
         <div class="section-title">Race Results</div>
         <div v-for="r in pendingRaces" :key="'pending-' + r.event_id + r.heat" class="result-card result-card--pending">
@@ -128,8 +142,12 @@ const unresultedStartLists = computed(() =>
       return ai - bi
     })
 )
+const draftRaces = computed(() =>
+  unresultedStartLists.value.filter(s => !s.heat)
+)
 const upcomingRaces = computed(() =>
   unresultedStartLists.value.filter(s => {
+    if (!s.heat) return false
     const h = props.heatSchedule.find(h => h.eventId === s.event_id && h.heat === s.heat)
     return !h?.isComplete
   })
@@ -252,9 +270,12 @@ function placeClass(place: string) {
 .race-columns--split { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; align-items: start; }
 .race-panel { min-width: 0; }
 .upcoming-race { background: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); border-radius: 8px; padding: 15px; margin-bottom: 10px; }
+.upcoming-race--draft { background: rgba(150,150,150,0.07); border-color: rgba(150,150,150,0.2); }
 .upcoming-race-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .upcoming-race .event-name { color: #4caf50; margin-bottom: 5px; font-weight: 600; }
+.upcoming-race--draft .event-name { color: #999; }
 .upcoming-race .heat-info { color: #888; font-size: 0.9rem; }
+.draft-notice { font-style: italic; color: #888; }
 .lane-badge { background: rgba(76,175,80,0.2); color: #4caf50; padding: 8px 15px; border-radius: 6px; font-weight: 600; }
 .seed-time { color: #888; font-size: 0.85rem; margin-left: 10px; }
 .eta-badge { background: rgba(255,193,7,0.2); color: #ffc107; padding: 8px 15px; border-radius: 6px; font-weight: 600; font-family: 'Monaco', 'Menlo', monospace; }

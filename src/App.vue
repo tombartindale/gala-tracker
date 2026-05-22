@@ -114,9 +114,9 @@
             </div>
           </div>
 
-          <div v-if="clubUpcomingRaces.length" class="club-upcoming">
+          <div v-if="clubUpcomingRaces.filter(r => r.heat).length" class="club-upcoming">
             <h4>Upcoming Races</h4>
-            <div v-for="race in clubUpcomingRaces" :key="`${race.eventId}-${race.heat}`" class="club-upcoming-row">
+            <div v-for="race in clubUpcomingRaces.filter(r => r.heat)" :key="`${race.eventId}-${race.heat}`" class="club-upcoming-row">
               <div class="club-upcoming-time">
                 <span v-if="race.estimatedStart" class="est-time">~{{ formatHeatTime(race.estimatedStart) }}</span>
                 <span v-else class="est-time no-time">—</span>
@@ -126,6 +126,19 @@
                 <span v-for="s in race.swimmers.sort((a, b) => parseInt(a.lane) - parseInt(b.lane))"
                   :key="s.displayName" class="club-upcoming-swimmer">
                   {{ s.displayName }}<span class="swimmer-lane">Ln {{ s.lane }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="clubUpcomingRaces.filter(r => !r.heat).length" class="club-upcoming club-upcoming--draft">
+            <h4>Entered — Heats to be Announced</h4>
+            <div v-for="race in clubUpcomingRaces.filter(r => !r.heat)" :key="`draft-${race.eventId}`" class="club-upcoming-row">
+              <div class="club-upcoming-time"><span class="est-time no-time">—</span></div>
+              <div class="club-upcoming-event">{{ race.eventName }} · <span class="draft-notice">Waiting for heat info</span></div>
+              <div class="club-upcoming-swimmers">
+                <span v-for="s in race.swimmers" :key="s.displayName" class="club-upcoming-swimmer">
+                  {{ s.displayName }}
                 </span>
               </div>
             </div>
@@ -178,7 +191,7 @@ const DEFAULT_WARMUP_MINS = 90 // fallback if not specified on the gala document
 
 // ── Firestore bindings ────────────────────────────────────────────────────────
 
-interface GalaConfig { gala_id: string; race_dates: string[] }
+interface GalaConfig { gala_id: string; race_dates: string[]; skip_warmup?: boolean }
 const config = useDocument<{ galas: GalaConfig[] }>(doc(db, 'config', 'scraper'))
 
 function todayUK() { return new Date().toLocaleDateString('en-GB') }
@@ -216,13 +229,22 @@ const isHistorical = computed(() =>
   !!route.params.galaId && route.params.galaId !== todayGalaId.value
 )
 
+function parseDDMMYY(d: string): number {
+  const [day, mon, yr] = d.split('/')
+  const fullYear = +yr < 100 ? 2000 + +yr : +yr
+  return new Date(fullYear, +mon - 1, +day).getTime()
+}
+
 const allGalas = computed(() =>
-  (config.value?.galas ?? []).map(g => ({
-    gala_id: g.gala_id,
-    isToday: g.race_dates.includes(todayUK()),
-    name: formatGalaName(g.gala_id),
-    dates: formatGalaDates(g.race_dates),
-  }))
+  (config.value?.galas ?? [])
+    .map(g => ({
+      gala_id: g.gala_id,
+      isToday: g.race_dates.includes(todayUK()),
+      name: formatGalaName(g.gala_id),
+      dates: formatGalaDates(g.race_dates),
+      _firstDate: g.race_dates.length ? Math.min(...g.race_dates.map(parseDDMMYY)) : 0,
+    }))
+    .sort((a, b) => a._firstDate - b._firstDate)
 )
 
 const gala = useDocument(computed(() =>
@@ -350,7 +372,8 @@ if (sessions.length) {
     for (const s of [...sessions].sort((a, b) => a.session_number - b.session_number)) {
       const ids = eventOrder.filter(id => s.events.includes(id))
       const rawStart = parseSessionStart(s.date, s.start_time)
-      const warmupMins = (gala.value as any)?.warmup_mins ?? DEFAULT_WARMUP_MINS
+      const galaConfig = config.value?.galas?.find(g => g.gala_id === galaId.value)
+      const warmupMins = galaConfig?.skip_warmup ? 0 : ((gala.value as any)?.warmup_mins ?? DEFAULT_WARMUP_MINS)
       const sessionStart = rawStart ? new Date(rawStart.getTime() + warmupMins * 60_000) : null
 groups.push({ sessionStart, eventIds: ids })
     }
@@ -1040,6 +1063,15 @@ select option {
   font-size: 0.85rem;
   color: #ddd;
   white-space: nowrap;
+}
+
+.draft-notice {
+  color: #aaa;
+  font-style: italic;
+}
+
+.club-upcoming--draft h4 {
+  color: #aaa;
 }
 
 .club-upcoming-swimmers {
